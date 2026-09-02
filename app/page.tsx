@@ -4,19 +4,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronRight, CircleGauge, Compass, Eye, Grip, Move, RotateCcw, RotateCw, Sparkles, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-const stages = ['삼각대', '가대', '균형', '경통', '축 정렬', '파인더', '초점'];
+const stages = ['삼각대', '가대', '무게추', '경통', '축 균형', '파인더', '초점'];
 const info = [
   { title:'삼각대 설치와 수평', desc:'준비물대에서 삼각대를 가져와 설치하고, 위에서 수준기를 보며 수평을 맞추세요.', tip:'삼각대의 한쪽 다리가 북쪽을 향하면 이후 극축 정렬이 더 안정적이에요.' },
   { title:'적도의식 가대 설치', desc:'방위 표시 N이 북쪽을 향하는지 확인한 후 가대를 삼각대 위에 결합하세요.', tip:'가대는 지구 자전축과 같은 방향으로 움직여 별을 부드럽게 추적하게 해요.' },
-  { title:'무게추 균형 맞추기', desc:'안전 나사를 확인하고 무게추를 봉 위에서 움직여 양쪽 균형을 맞추세요.', tip:'경통을 달기 전에 무게추를 먼저 설치해야 갑작스러운 회전과 낙하를 막을 수 있어요.' },
+  { title:'무게추 설치하기', desc:'안전 나사를 확인하고 무게추를 봉에 끼운 뒤 임시 위치에 놓으세요.', tip:'경통을 달기 전에 무게추를 먼저 설치해야 갑작스러운 회전과 낙하를 막을 수 있어요.' },
   { title:'경통 고정하기', desc:'도브테일 레일을 안장 홈에 끝까지 넣고 잠금 손잡이를 조이세요.', tip:'경통을 한 손으로 계속 받친 채 잠금 손잡이가 단단한지 확인하세요.' },
-  { title:'적경·적위 수평 맞추기', desc:'각 축의 클러치를 풀어 수평 위치를 찾은 뒤 다시 잠그세요.', tip:'두 축에서 어느 방향으로도 저절로 돌아가지 않아야 정확한 균형 상태예요.' },
+  { title:'적경·적위 축 균형 맞추기', desc:'각 축의 클러치를 풀고 무게추와 경통 위치를 조절한 뒤 다시 잠그세요.', tip:'손을 놓아도 어느 방향으로도 저절로 돌아가지 않아야 정확한 균형 상태예요.' },
   { title:'파인더 정렬하기', desc:'파인더의 십자선을 주경 화면의 밝은 별과 정확히 겹치게 하세요.', tip:'먼 지상의 물체로 낮에 미리 맞추면 밤에 별을 찾는 시간이 훨씬 짧아져요.' },
   { title:'목성에 초점 맞추기', desc:'초점 손잡이를 천천히 돌려 목성의 가장자리가 가장 또렷해지는 지점을 찾으세요.', tip:'초점 지점을 지나쳤다면 반대 방향으로 아주 조금씩 되돌리세요.' },
 ];
 
 type TripodPhase = 'shelf' | 'placed' | 'spread' | 'level';
-type MountPhase = 'rack' | 'placed';
+type MountPhase = 'rack' | 'snapped' | 'secured';
+type CounterPhase = 'rack' | 'installed';
+type TubePhase = 'rack' | 'snapped' | 'locked';
+type AxisPhase = 'ra-locked' | 'ra-free' | 'dec-locked' | 'dec-free' | 'complete';
+type FinderPhase = 'rack' | 'snapped' | 'locked' | 'aligning' | 'complete';
+type ObservationPhase = 'diagonal-rack' | 'diagonal-snapped' | 'diagonal-locked' | 'eyepiece-rack' | 'eyepiece-snapped' | 'eyepiece-locked' | 'focusing' | 'complete';
 const initial = [28,0,78,0,27,72,22,76,18,72,0];
 
 export default function Home() {
@@ -31,6 +36,23 @@ export default function Home() {
   const [mountPos, setMountPos] = useState({x:38,y:150});
   const [mountDragging, setMountDragging] = useState(false);
   const [mountDropHint, setMountDropHint] = useState(false);
+  const [counterPhase, setCounterPhase] = useState<CounterPhase>('rack');
+  const [counterPos, setCounterPos] = useState({x:44,y:170});
+  const [counterDragging, setCounterDragging] = useState(false);
+  const [counterDropHint, setCounterDropHint] = useState(false);
+  const [tubePhase, setTubePhase] = useState<TubePhase>('rack');
+  const [tubePos, setTubePos] = useState({x:42,y:165});
+  const [tubeDragging, setTubeDragging] = useState(false);
+  const [tubeDropHint, setTubeDropHint] = useState(false);
+  const [axisPhase, setAxisPhase] = useState<AxisPhase>('ra-locked');
+  const [finderPhase, setFinderPhase] = useState<FinderPhase>('rack');
+  const [finderPos, setFinderPos] = useState({x:42,y:160});
+  const [finderDragging, setFinderDragging] = useState(false);
+  const [finderDropHint, setFinderDropHint] = useState(false);
+  const [observationPhase, setObservationPhase] = useState<ObservationPhase>('diagonal-rack');
+  const [observationPos, setObservationPos] = useState({x:42,y:160});
+  const [observationDragging, setObservationDragging] = useState(false);
+  const [observationDropHint, setObservationDropHint] = useState(false);
   const [complete, setComplete] = useState(false);
   const setValue = (index:number, value:number) => setValues(v => v.map((n,i)=>i===index?value:n));
 
@@ -41,20 +63,37 @@ export default function Home() {
       setStage(Math.min(data.stage ?? 0,6));
       setValues(initial.map((n,i)=>typeof data.values?.[i]==='number'?data.values[i]:n));
       setTripodPhase(data.tripodPhase ?? ((data.stage ?? 0)>0?'level':'shelf'));
-      setMountPhase(data.mountPhase ?? ((data.stage ?? 0)>1?'placed':'rack'));
+      const savedMount = data.mountPhase === 'placed' ? 'secured' : data.mountPhase;
+      setMountPhase(savedMount ?? ((data.stage ?? 0)>1?'secured':'rack'));
+      setCounterPhase(data.counterPhase ?? ((data.stage ?? 0)>2?'installed':'rack'));
+      setTubePhase(data.tubePhase ?? ((data.stage ?? 0)>3?'locked':'rack'));
+      setAxisPhase(data.axisPhase ?? ((data.stage ?? 0)>4?'complete':'ra-locked'));
+      setFinderPhase(data.finderPhase ?? ((data.stage ?? 0)>5?'complete':'rack'));
+      setObservationPhase(data.observationPhase ?? 'diagonal-rack');
     } catch {}
   }, []);
-  useEffect(() => { localStorage.setItem('telescope-lab-progress',JSON.stringify({stage,values,tripodPhase,mountPhase})); }, [stage,values,tripodPhase,mountPhase]);
+  useEffect(() => { localStorage.setItem('telescope-lab-progress',JSON.stringify({stage,values,tripodPhase,mountPhase,counterPhase,tubePhase,axisPhase,finderPhase,observationPhase})); }, [stage,values,tripodPhase,mountPhase,counterPhase,tubePhase,axisPhase,finderPhase,observationPhase]);
+  useEffect(() => {
+    if (stage===1 && mountPhase==='snapped' && values[1]>=85 && values[10]>=85) setMountPhase('secured');
+  }, [stage, mountPhase, values]);
+  useEffect(() => {
+    if (stage===5 && finderPhase==='aligning' && Math.abs(values[6]-50)<7 && Math.abs(values[7]-50)<7) setFinderPhase('complete');
+  }, [stage, finderPhase, values]);
+  useEffect(() => {
+    if(stage!==6 || observationPhase!=='focusing' || Math.abs(values[8]-50)>=5)return;
+    const hold=window.setTimeout(()=>setObservationPhase('complete'),850);
+    return ()=>window.clearTimeout(hold);
+  }, [stage, observationPhase, values]);
 
   const levelPassed = Math.abs(values[0]-50)<4 && Math.abs(values[9]-50)<4;
   const passed = useMemo(() => [
-    tripodPhase==='level' && levelPassed, mountPhase==='placed' && values[1]>=85 && values[10]>=85, Math.abs(values[2]-50)<6, values[3]===1,
-    Math.abs(values[4]-50)<6 && Math.abs(values[5]-50)<6,
-    Math.abs(values[6]-50)<7 && Math.abs(values[7]-50)<7,
-    Math.abs(values[8]-50)<6,
-  ][stage], [stage,values,tripodPhase,mountPhase,levelPassed]);
+    tripodPhase==='level' && levelPassed, mountPhase==='secured', Math.abs(values[2]-50)<6, tubePhase==='locked' && values[3]===1,
+    axisPhase==='complete' && Math.abs(values[4]-50)<6 && Math.abs(values[5]-50)<6,
+    finderPhase==='complete' && Math.abs(values[6]-50)<7 && Math.abs(values[7]-50)<7,
+    observationPhase==='complete' && Math.abs(values[8]-50)<5,
+  ][stage], [stage,values,tripodPhase,mountPhase,tubePhase,axisPhase,finderPhase,observationPhase,levelPassed]);
 
-  const reset = () => { setStage(0); setValues(initial); setTripodPhase('shelf'); setTripodPos({x:28,y:170}); setMountPhase('rack'); setMountPos({x:38,y:150}); setComplete(false); localStorage.removeItem('telescope-lab-progress'); };
+  const reset = () => { setStage(0); setValues(initial); setTripodPhase('shelf'); setTripodPos({x:28,y:170}); setMountPhase('rack'); setMountPos({x:38,y:150}); setCounterPhase('rack'); setCounterPos({x:44,y:170}); setTubePhase('rack'); setTubePos({x:42,y:165}); setAxisPhase('ra-locked'); setFinderPhase('rack'); setFinderPos({x:42,y:160}); setObservationPhase('diagonal-rack'); setObservationPos({x:42,y:160}); setComplete(false); localStorage.removeItem('telescope-lab-progress'); };
   const next = () => stage===6 ? setComplete(true) : setStage(s=>s+1);
   const phaseCopy = tripodPhase==='shelf'
     ? {title:'삼각대 가져오기',desc:'준비물대의 접힌 삼각대를 잡아 빛나는 설치 원 안으로 드래그하세요.'}
@@ -63,6 +102,19 @@ export default function Home() {
       : tripodPhase==='spread'
         ? {title:'수준기 확인하기',desc:'삼각대가 안정적으로 섰습니다. 삼각대 위에서 원형 기포 수준기를 들여다보세요.'}
         : {title:'위에서 보며 수평 맞추기',desc:'상부 수준기의 기포가 중앙 원 안으로 들어오도록 동쪽·남쪽 다리 높이를 조절하세요.'};
+  const observationCopy = observationPhase==='diagonal-rack'
+    ? {title:'천정미러 가져오기',desc:'준비물대의 90° 천정미러를 경통 뒤 포커서 결합부로 드래그하세요.'}
+    : observationPhase==='diagonal-snapped'
+      ? {title:'천정미러 고정하기',desc:'천정미러가 끝까지 들어갔습니다. 측면 고정 나사를 조여 회전하지 않게 하세요.'}
+      : observationPhase==='diagonal-locked'
+        ? {title:'천정미러 설치 완료',desc:'빛의 경로가 위쪽으로 꺾였습니다. 이제 저배율 25mm 접안렌즈를 준비하세요.'}
+        : observationPhase==='eyepiece-rack'
+          ? {title:'25mm 접안렌즈 설치',desc:'접안렌즈의 은색 배럴을 천정미러 위 소켓으로 드래그해 끝까지 끼우세요.'}
+          : observationPhase==='eyepiece-snapped'
+            ? {title:'접안렌즈 고정하기',desc:'접안렌즈를 한 손으로 받친 채 작은 고정 나사를 조이세요.'}
+            : observationPhase==='eyepiece-locked'
+              ? {title:'관측 자세 준비',desc:'광학 부품이 모두 고정되었습니다. 접안부 시야를 열고 목성을 확인하세요.'}
+              : {title:'목성에 초점 맞추기',desc:'초점 손잡이를 천천히 돌려 목성의 띠와 가장자리가 가장 또렷한 지점을 찾으세요.'};
 
   const dragMove = (e:React.PointerEvent<HTMLDivElement>) => {
     if(!dragging)return;
@@ -90,9 +142,50 @@ export default function Home() {
   const mountDragEnd = (e:React.PointerEvent<HTMLDivElement>) => {
     if(!mountDragging)return;
     e.currentTarget.releasePointerCapture(e.pointerId); setMountDragging(false);
-    if(mountDropHint){setMountPhase('placed');setMountPos({x:0,y:0});}
+    if(mountDropHint){setMountPhase('snapped');setMountPos({x:0,y:0});}
     else setMountPos({x:38,y:150});
     setMountDropHint(false);
+  };
+  const counterDragMove = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!counterDragging)return;
+    const bench=e.currentTarget.parentElement?.getBoundingClientRect(); if(!bench)return;
+    setCounterPos({x:e.clientX-bench.left-52,y:e.clientY-bench.top-70});
+    setCounterDropHint(Math.abs(e.clientX-(bench.left+bench.width*.57))<115 && e.clientY>bench.top+bench.height*.2 && e.clientY<bench.top+bench.height*.72);
+  };
+  const counterDragEnd = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!counterDragging)return; e.currentTarget.releasePointerCapture(e.pointerId); setCounterDragging(false);
+    if(counterDropHint){setCounterPhase('installed');setCounterPos({x:0,y:0});} else setCounterPos({x:44,y:170});
+    setCounterDropHint(false);
+  };
+  const tubeDragMove = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!tubeDragging)return; const bench=e.currentTarget.parentElement?.getBoundingClientRect(); if(!bench)return;
+    setTubePos({x:e.clientX-bench.left-90,y:e.clientY-bench.top-55});
+    setTubeDropHint(Math.abs(e.clientX-(bench.left+bench.width*.57))<130 && e.clientY>bench.top+bench.height*.17 && e.clientY<bench.top+bench.height*.62);
+  };
+  const tubeDragEnd = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!tubeDragging)return; e.currentTarget.releasePointerCapture(e.pointerId); setTubeDragging(false);
+    if(tubeDropHint){setTubePhase('snapped');setTubePos({x:0,y:0});} else setTubePos({x:42,y:165}); setTubeDropHint(false);
+  };
+  const finderDragMove = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!finderDragging)return; const bench=e.currentTarget.parentElement?.getBoundingClientRect(); if(!bench)return;
+    setFinderPos({x:e.clientX-bench.left-72,y:e.clientY-bench.top-48});
+    setFinderDropHint(Math.abs(e.clientX-(bench.left+bench.width*.57))<130 && e.clientY>bench.top+bench.height*.1 && e.clientY<bench.top+bench.height*.46);
+  };
+  const finderDragEnd = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!finderDragging)return; e.currentTarget.releasePointerCapture(e.pointerId); setFinderDragging(false);
+    if(finderDropHint){setFinderPhase('snapped');setFinderPos({x:0,y:0});} else setFinderPos({x:42,y:160}); setFinderDropHint(false);
+  };
+  const observationDragMove = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!observationDragging)return; const bench=e.currentTarget.parentElement?.getBoundingClientRect(); if(!bench)return;
+    const isEyepiece=observationPhase==='eyepiece-rack';
+    setObservationPos({x:e.clientX-bench.left-(isEyepiece?44:70),y:e.clientY-bench.top-(isEyepiece?70:54)});
+    setObservationDropHint(Math.abs(e.clientX-(bench.left+bench.width*.68))<(isEyepiece?105:125) && e.clientY>bench.top+bench.height*.08 && e.clientY<bench.top+bench.height*.52);
+  };
+  const observationDragEnd = (e:React.PointerEvent<HTMLDivElement>) => {
+    if(!observationDragging)return; e.currentTarget.releasePointerCapture(e.pointerId); setObservationDragging(false);
+    if(observationDropHint){setObservationPhase(observationPhase==='diagonal-rack'?'diagonal-snapped':'eyepiece-snapped');setObservationPos({x:0,y:0});}
+    else setObservationPos({x:42,y:160});
+    setObservationDropHint(false);
   };
 
   if (!started) return (
@@ -111,20 +204,42 @@ export default function Home() {
       <section className={`workbench ${stage===0&&tripodPhase==='level'?'level-camera':''}`}>
         <div className="scene-status"><span><Compass/> 방위 000° N</span><span><CircleGauge/> 단계 {stage+1}/7</span>{stage===0&&<span className="camera-chip">{tripodPhase==='level'?<><Eye/> TOP VIEW</>:<><Move/> FIELD VIEW</>}</span>}</div>
         {stage===0&&<EquipmentRack empty={tripodPhase!=='shelf'}/>} 
-        {stage===1&&<MountRack empty={mountPhase==='placed'}/>} 
+        {stage===1&&<MountRack empty={mountPhase!=='rack'}/>} 
+        {stage===2&&<CounterweightRack empty={counterPhase!=='rack'}/>} 
+        {stage===3&&<TubeRack empty={tubePhase!=='rack'}/>} 
+        {stage===5&&<FinderRack empty={finderPhase!=='rack'}/>} 
+        {stage===6&&<ObservationRack phase={observationPhase}/>} 
         {stage===0&&tripodPhase==='shelf'&&<div role="button" tabIndex={0} aria-label="접힌 삼각대. 설치 위치로 드래그하세요" className={`draggable-tripod ${dragging?'dragging':''}`} style={{left:tripodPos.x,top:tripodPos.y}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setDragging(true)}} onPointerMove={dragMove} onPointerUp={dragEnd}><Grip/><FoldedTripod/><span>잡아서 드래그</span></div>}
         {stage===0&&tripodPhase!=='shelf'&&tripodPhase!=='level'&&<TripodModel folded={tripodPhase==='placed'} tiltX={0} tiltY={0}/>} 
-        {stage>0&&<TelescopeModel stage={stage} counter={values[2]} mountVisible={stage>1||mountPhase==='placed'}/>} 
+        {stage>0&&<TelescopeModel stage={stage} counter={values[2]} mountVisible={stage>1||mountPhase!=='rack'} counterVisible={stage>2||counterPhase!=='rack'} tubePhase={tubePhase} axisPhase={axisPhase} finderPhase={finderPhase} observationPhase={observationPhase}/>} 
+        {stage===4&&<><AxisBalanceHUD phase={axisPhase} ra={values[4]} dec={values[5]}/><AxisDragSurface phase={axisPhase} value={axisPhase==='ra-free'?values[4]:values[5]} setValue={setValue}/><AxisBalanceControls phase={axisPhase} setPhase={setAxisPhase} values={values} setValue={setValue}/></>} 
         {stage===0&&tripodPhase==='shelf'&&<div className={`drop-zone ${dropHint?'ready':''}`}><div className="drop-rings"/><b>{dropHint?'여기에 놓으세요':'삼각대 설치 위치'}</b><small>NORTH LEG</small></div>}
         {stage===1&&mountPhase==='rack'&&<><div role="button" tabIndex={0} aria-label="적도의식 가대. 삼각대 상판으로 드래그하세요" className={`draggable-mount ${mountDragging?'dragging':''}`} style={{left:mountPos.x,top:mountPos.y}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setMountDragging(true)}} onPointerMove={mountDragMove} onPointerUp={mountDragEnd}><Grip/><img src="/equatorial-mount-stylized-v3.png" alt="캐릭터 스타일 적도의식 가대"/><span>잡아서 드래그</span></div><div className={`mount-drop-target ${mountDropHint?'ready':''}`}><i/><span>가대 결합부</span></div></>}
-        {stage===1&&mountPhase==='placed'&&<><button className={`scene-screw underside ${values[1]>=85?'tight':''}`} onClick={()=>setValue(1,Math.min(100,values[1]+20))} aria-label="삼각대 아래 중앙 고정나사 조이기" style={{rotate:`${values[1]*3.2}deg`}}><RotateCw/></button><button className={`scene-screw side ${values[10]>=85?'tight':''}`} onClick={()=>setValue(10,Math.min(100,values[10]+20))} aria-label="가대 측면 방위 잠금나사 조이기" style={{rotate:`${values[10]*3.2}deg`}}><RotateCw/></button><div className="mount-lock-status"><span className={values[1]>=85?'done':''}>하부 고정</span><span className={values[10]>=85?'done':''}>측면 잠금</span></div></>}
+        {stage===2&&counterPhase==='rack'&&<><div role="button" tabIndex={0} aria-label="무게추. 가대의 무게추 봉으로 드래그하세요" className={`draggable-counter ${counterDragging?'dragging':''}`} style={{left:counterPos.x,top:counterPos.y}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setCounterDragging(true)}} onPointerMove={counterDragMove} onPointerUp={counterDragEnd}><Grip/><CounterweightPiece/><span>잡아서 드래그</span></div><div className={`counter-drop-target ${counterDropHint?'ready':''}`}><i/><span>무게추 봉</span></div></>}
+        {stage===3&&tubePhase==='rack'&&<><div role="button" tabIndex={0} aria-label="경통. 가대 안장으로 드래그하세요" className={`draggable-tube ${tubeDragging?'dragging':''}`} style={{left:tubePos.x,top:tubePos.y}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setTubeDragging(true)}} onPointerMove={tubeDragMove} onPointerUp={tubeDragEnd}><Grip/><TubePiece/><span>양손으로 잡고 드래그</span></div><div className={`tube-drop-target ${tubeDropHint?'ready':''}`}><i/><span>도브테일 안장</span></div></>}
+        {stage===3&&tubePhase==='snapped'&&<div className="tube-clamp-highlight"/>}
+        {stage===5&&finderPhase==='rack'&&<><div role="button" tabIndex={0} aria-label="파인더. 경통 위 파인더 슈로 드래그하세요" className={`draggable-finder ${finderDragging?'dragging':''}`} style={{left:finderPos.x,top:finderPos.y}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setFinderDragging(true)}} onPointerMove={finderDragMove} onPointerUp={finderDragEnd}><Grip/><img src="/finder-scope-stylized-v1.png" alt="소형 굴절망원경 파인더"/><span>잡아서 드래그</span></div><div className={`finder-drop-target ${finderDropHint?'ready':''}`}><i/><span>파인더 슈</span></div></>}
+        {stage===5&&finderPhase==='snapped'&&<div className="finder-lock-highlight"><RotateCw/></div>}
+        {stage===5&&<FinderStageControls phase={finderPhase} setPhase={setFinderPhase} values={values} setValue={setValue}/>} 
+        {stage===6&&(observationPhase==='diagonal-rack'||observationPhase==='eyepiece-rack')&&<><div role="button" tabIndex={0} aria-label={observationPhase==='diagonal-rack'?'천정미러. 경통 뒤 포커서로 드래그하세요':'25밀리미터 접안렌즈. 천정미러 위 소켓으로 드래그하세요'} className={`draggable-observation ${observationPhase==='eyepiece-rack'?'eyepiece-part':'diagonal-part'} ${observationDragging?'dragging':''}`} style={{left:observationPos.x,top:observationPos.y}} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setObservationDragging(true)}} onPointerMove={observationDragMove} onPointerUp={observationDragEnd}><Grip/><img src={observationPhase==='diagonal-rack'?'/star-diagonal-stylized-v1.png':'/eyepiece-25mm-stylized-v1.png'} alt={observationPhase==='diagonal-rack'?'90도 천정미러':'25밀리미터 접안렌즈'}/><span>잡아서 드래그</span></div><div className={`observation-drop-target ${observationPhase==='eyepiece-rack'?'eyepiece-target':''} ${observationDropHint?'ready':''}`}><i/><span>{observationPhase==='diagonal-rack'?'포커서 결합부':'접안렌즈 소켓'}</span></div></>}
+        {stage===6&&(observationPhase==='diagonal-snapped'||observationPhase==='eyepiece-snapped')&&<div className={`observation-lock-highlight ${observationPhase.startsWith('eyepiece')?'eyepiece-lock':''}`}><RotateCw/></div>}
+        {stage===6&&<ObservationStageControls phase={observationPhase} setPhase={setObservationPhase} focus={values[8]} setValue={setValue}/>} 
+        {stage===1&&mountPhase!=='rack'&&<><div className="mount-seat-highlight"/><button className={`scene-screw underside ${values[1]>=85?'tight':''}`} onClick={()=>setValue(1,Math.min(100,values[1]+20))} aria-label="삼각대 아래 중앙 고정나사 조이기" style={{rotate:`${values[1]*3.2}deg`}}><RotateCw/></button><button className={`scene-screw side ${values[10]>=85?'tight':''}`} onClick={()=>setValue(10,Math.min(100,values[10]+20))} aria-label="가대 측면 방위 잠금나사 조이기" style={{rotate:`${values[10]*3.2}deg`}}><RotateCw/></button><div className="mount-lock-status"><span className={values[1]>=85?'done':''}>하부 고정</span><span className={values[10]>=85?'done':''}>측면 잠금</span></div></>}
         {stage===0&&tripodPhase!=='shelf'&&tripodPhase!=='level'&&<div className="ground-ring installed"/>}
         {stage===0&&tripodPhase==='level'&&<div className="top-level-inspection"><div className="tripod-top-plate"><span className="north-mark">N</span><div className={`round-level ${levelPassed?'ok':''}`}><div className="level-target"/><i style={{left:`${values[0]}%`,top:`${values[9]}%`}}/></div><div className="bolt b1"/><div className="bolt b2"/><div className="bolt b3"/></div><div className="camera-caption"><span>상부 카메라 · 90°</span><b>{levelPassed?'수평 기준 확보':'기포를 중앙 원 안으로 이동'}</b></div></div>}
-        {stage===5&&<div className="finder-view"><div className="target-star"/><div className="crosshair" style={{left:`${values[6]}%`,top:`${values[7]}%`}}/></div>}
-        {stage===6&&<div className="eyepiece-view"><div className="jupiter" style={{filter:`blur(${Math.abs(values[8]-50)/7}px)`}}><i/></div><small>{passed?'초점이 정확합니다':'초점 손잡이를 조절하세요'}</small></div>}
+        {stage===5&&(finderPhase==='aligning'||finderPhase==='complete')&&<div className="dual-finder-view"><div className="scope-view"><b>주경 시야</b><div className="target-star"/><i className="scope-center"/></div><div className={`finder-view ${finderPhase==='complete'?'aligned':''}`}><b>파인더 시야</b><div className="target-star"/><div className="crosshair" style={{left:`${values[6]}%`,top:`${values[7]}%`}}/></div></div>}
+        {stage===6&&(observationPhase==='focusing'||observationPhase==='complete')&&<FocusView focus={values[8]} complete={observationPhase==='complete'}/>} 
       </section>
 
-      <aside className="task-panel glass"><div className="task-no">STEP {String(stage+1).padStart(2,'0')} / 07</div><h2>{stage===0?phaseCopy.title:stage===1&&mountPhase==='rack'?'가대 가져오기':info[stage].title}</h2><p>{stage===0?phaseCopy.desc:stage===1&&mountPhase==='rack'?'준비물대의 적도의식 가대를 잡아 삼각대 상판의 결합 표시로 드래그하세요.':stage===1?'가대를 받친 상태에서 삼각대 아래 중앙 고정나사와 가대 옆 방위 잠금나사를 모두 조이세요.':info[stage].desc}</p><div className="tip"><b>관측 노트</b><span>{info[stage].tip}</span></div><Controls stage={stage} values={values} setValue={setValue} tripodPhase={tripodPhase} setTripodPhase={setTripodPhase} mountPhase={mountPhase}/>{stage===0&&tripodPhase!=='level'?<div className="mini-sequence"><span className={tripodPhase!=='shelf'?'done':''}>1 위치</span><span className={tripodPhase==='spread'||tripodPhase==='level'?'done':''}>2 펼치기</span><span className={tripodPhase==='level'?'done':''}>3 수평</span></div>:stage===1&&mountPhase==='rack'?<div className="mini-sequence"><span>1 운반</span><span>2 하부 나사</span><span>3 측면 나사</span></div>:<div className={`check-state ${passed?'pass':''}`}>{passed?<><Check/> 조건을 만족했습니다</>:<>● 완료 조건을 찾아보세요</>}</div>}<Button className="next" disabled={!passed} onClick={next}>{stage===6?'관측 결과 확인':'다음 단계로'} <ChevronRight/></Button></aside>
+      <aside className="task-panel glass">
+        <div className="task-no">STEP {String(stage+1).padStart(2,'0')} / 07</div>
+        <h2>{stage===0?phaseCopy.title:stage===6?observationCopy.title:stage===1&&mountPhase==='rack'?'가대 가져오기':stage===2&&counterPhase==='rack'?'무게추 가져오기':stage===3&&tubePhase==='rack'?'경통 가져오기':info[stage].title}</h2>
+        <p>{stage===0?phaseCopy.desc:stage===6?observationCopy.desc:stage===1&&mountPhase==='rack'?'준비물대의 적도의식 가대를 잡아 삼각대 상판의 결합 표시로 드래그하세요.':stage===1&&mountPhase==='snapped'?'결합점에 정확히 안착했습니다. 아래 중앙 나사와 옆 잠금 나사를 순서대로 조이세요.':stage===1?'가대가 고정되었습니다. 이제 다음 단계에서 무게추를 설치합니다.':stage===2&&counterPhase==='rack'?'무게추를 가대 옆 봉의 결합 표시까지 드래그해 끼우세요.':stage===2?'무게추가 설치되었습니다. 봉 위에서 위치를 움직여 균형을 맞추세요.':stage===3&&tubePhase==='rack'?'경통을 양손으로 받쳐 가대 안장의 결합 표시까지 드래그하세요.':stage===3&&tubePhase==='snapped'?'도브테일 레일이 안착했습니다. 경통을 받친 채 잠금 손잡이를 조이세요.':stage===3?'경통이 단단히 고정되었습니다. 이제 축 정렬을 시작합니다.':info[stage].desc}</p>
+        <div className="tip"><b>관측 노트</b><span>{info[stage].tip}</span></div>
+        <Controls stage={stage} values={values} setValue={setValue} tripodPhase={tripodPhase} setTripodPhase={setTripodPhase} mountPhase={mountPhase} counterPhase={counterPhase} tubePhase={tubePhase} setTubePhase={setTubePhase}/>
+        {stage===6?<ObservationSequence phase={observationPhase}/>:stage===0&&tripodPhase!=='level'?<div className="mini-sequence"><span className={tripodPhase!=='shelf'?'done':''}>1 위치</span><span className={tripodPhase==='spread'||tripodPhase==='level'?'done':''}>2 펼치기</span><span className={tripodPhase==='level'?'done':''}>3 수평</span></div>:stage===1?<div className="mini-sequence"><span className={mountPhase!=='rack'?'done':''}>1 안착</span><span className={values[1]>=85?'done':''}>2 하부 나사</span><span className={values[10]>=85?'done':''}>3 측면 나사</span></div>:stage===2?<div className="mini-sequence"><span className={counterPhase!=='rack'?'done':''}>1 안착</span><span className={counterPhase!=='rack'&&passed?'done':''}>2 균형</span></div>:stage===3?<div className="mini-sequence"><span className={tubePhase!=='rack'?'done':''}>1 안착</span><span className={tubePhase==='locked'?'done':''}>2 잠금</span></div>:<div className={`check-state ${passed?'pass':''}`}>{passed?<><Check/> 조건을 만족했습니다</>:<>● 완료 조건을 찾아보세요</>}</div>}
+        <Button className="next" disabled={!passed} onClick={next}>{stage===6?'관측 결과 확인':'다음 단계로'} <ChevronRight/></Button>
+      </aside>
 
       {complete&&<div className="complete-overlay"><section className="complete-card glass"><Trophy/><div className="eyebrow">MISSION COMPLETE</div><h2>첫 관측에 성공했어요!</h2><p>7단계 설치를 모두 마치고 목성에 정확히 초점을 맞췄습니다.</p><div className="score"><b>7 / 7</b><span>완료 단계</span></div><Button className="launch" onClick={reset}>한 번 더 연습하기 <RotateCcw/></Button></section></div>}
       <footer><span>관측지 · 해발 640m</span><span>맑음 · 시상 4/5</span><span>진행 상황 자동 저장</span></footer>
@@ -134,17 +249,30 @@ export default function Home() {
 
 function EquipmentRack({empty}:{empty:boolean}) { return <div className="equipment-rack glass"><div className="rack-title"><span>준비물대</span><small>EQUIPMENT 01</small></div><div className={`rack-slot ${empty?'empty':''}`}><span>삼각대</span><small>{empty?'사용 중':'ALUMINUM TRIPOD'}</small></div><div className="rack-parts"><i/><i/><i/></div></div>; }
 function MountRack({empty}:{empty:boolean}) { return <div className="equipment-rack mount-rack glass"><div className="rack-title"><span>준비물대</span><small>EQUIPMENT 02</small></div><div className={`rack-slot mount-slot ${empty?'empty':''}`}><span>적도의식 가대</span><small>{empty?'설치 중':'EQUATORIAL MOUNT'}</small></div><div className="rack-parts"><i/><i/><i/></div></div>; }
+function CounterweightRack({empty}:{empty:boolean}) { return <div className="equipment-rack counter-rack glass"><div className="rack-title"><span>준비물대</span><small>EQUIPMENT 03</small></div><div className={`rack-slot counter-slot ${empty?'empty':''}`}><span>무게추</span><small>{empty?'사용 중':'COUNTERWEIGHT'}</small></div><div className="rack-parts"><i/><i/><i/></div></div>; }
+function TubeRack({empty}:{empty:boolean}) { return <div className="equipment-rack tube-rack glass"><div className="rack-title"><span>준비물대</span><small>EQUIPMENT 04</small></div><div className={`rack-slot tube-slot ${empty?'empty':''}`}><span>경통</span><small>{empty?'사용 중':'OPTICAL TUBE'}</small></div><div className="rack-parts"><i/><i/><i/></div></div>; }
+function FinderRack({empty}:{empty:boolean}) { return <div className="equipment-rack finder-rack glass"><div className="rack-title"><span>준비물대</span><small>EQUIPMENT 05</small></div><div className={`rack-slot finder-slot ${empty?'empty':''}`}><span>파인더</span><small>{empty?'사용 중':'FINDER SCOPE'}</small></div><div className="rack-parts"><i/><i/><i/></div></div>; }
+function ObservationRack({phase}:{phase:ObservationPhase}){const eyepiece=phase.startsWith('eyepiece');const available=phase==='diagonal-rack'||phase==='eyepiece-rack';return <div className="equipment-rack observation-rack glass"><div className="rack-title"><span>접안부 준비물</span><small>EQUIPMENT 06</small></div><div className={`rack-slot observation-slot ${eyepiece?'eyepiece-slot':''} ${available?'':'empty'}`}><span>{eyepiece?'25mm 접안렌즈':'90° 천정미러'}</span><small>{available?'LOW POWER SET':'설치 중'}</small></div><div className="rack-parts"><i/><i/><i/></div></div>}
 function FoldedTripod(){return <div className="folded-stand"><div className="folded-head"/><i/><i/><i/><b/></div>}
+function CounterweightPiece(){return <div className="counterweight-piece"><i/><b/><span/></div>}
+function TubePiece(){return <img className="tube-piece-image" src="/optical-tube-stylized-v2.png" alt="흰색 굴절망원경 경통과 도브테일 레일"/>}
 function TripodModel({folded,tiltX,tiltY}:{folded:boolean,tiltX:number,tiltY:number}){if(!folded)return <div className="tripod-model photo-tripod" style={{rotate:`${tiltX+tiltY}deg`}}><img src="/telescope-stage-01-v4.png" alt="캐릭터 스타일 알루미늄 천체망원경 삼각대"/></div>;return <div className="tripod-model folded" style={{rotate:`${tiltX+tiltY}deg`}}><div className="tripod-platform"><i/><b/></div><div className="column"><i/></div><div className="brace-ring"/><div className="tripod-leg tl1"><i/></div><div className="tripod-leg tl2"><i/></div><div className="tripod-leg tl3"><i/></div></div>}
-function TelescopeModel({stage,mountVisible}:{stage:number,counter:number,mountVisible:boolean}){const src=stage===1?(mountVisible?'/telescope-stage-02-v4.png':'/telescope-stage-01-v4.png'):stage===2?'/telescope-stage-03-v4.png':stage===3?'/telescope-stage-04-v4.png':'/telescope-master-stylized-v3.png';return <div className="telescope-pro cohesive-rig"><img src={src} alt={`조립 ${stage+1}단계의 소형 굴절망원경`}/></div>}
+function AxisBalanceHUD({phase,ra,dec}:{phase:AxisPhase,ra:number,dec:number}){const isRa=phase==='ra-locked'||phase==='ra-free';const value=isRa?ra:dec;const error=Math.abs(value-50);return <div className="axis-balance-hud"><b>{isRa?'RA · 적경축':'DEC · 적위축'}</b><span className={error<6?'balanced':error<18?'near':''}>{error<6?'균형 확보':value<50?'경통 쪽으로 기움':'무게추 쪽으로 기움'}</span><div><i style={{left:`${value}%`}}/></div><small>{phase==='complete'?'두 축 잠금 완료':phase.endsWith('free')?'클러치 해제 · 위치 조절 중':'클러치 잠금 상태'}</small></div>}
+function AxisDragSurface({phase,value,setValue}:{phase:AxisPhase,value:number,setValue:(i:number,v:number)=>void}){const [active,setActive]=useState(false);if(phase!=='ra-free'&&phase!=='dec-free')return null;const index=phase==='ra-free'?4:5;const move=(e:React.PointerEvent<HTMLDivElement>)=>{if(!active)return;const rect=e.currentTarget.parentElement?.getBoundingClientRect();if(!rect)return;const next=Math.max(0,Math.min(100,((e.clientX-rect.left)/rect.width)*100));setValue(index,Math.round(next))};return <div role="slider" aria-label={phase==='ra-free'?'화면에서 무게추 위치 조절':'화면에서 경통 앞뒤 위치 조절'} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} className={`axis-drag-hotspot ${phase==='ra-free'?'ra':'dec'} ${active?'active':''}`} onPointerDown={e=>{e.currentTarget.setPointerCapture(e.pointerId);setActive(true)}} onPointerMove={move} onPointerUp={e=>{e.currentTarget.releasePointerCapture(e.pointerId);setActive(false)}}><Move/><span>{phase==='ra-free'?'무게추를 좌우로 드래그':'경통을 앞뒤로 드래그'}</span></div>}
+function AxisBalanceControls({phase,setPhase,values,setValue}:{phase:AxisPhase,setPhase:(p:AxisPhase)=>void,values:number[],setValue:(i:number,v:number)=>void}){const raOk=Math.abs(values[4]-50)<6;const decOk=Math.abs(values[5]-50)<6;if(phase==='ra-locked')return <div className="axis-control-dock"><b>1 · 적경축 균형</b><p>클러치를 풀어 무게추 봉이 자유롭게 움직이도록 하세요.</p><Button onClick={()=>setPhase('ra-free')}><RotateCw/> 적경축 클러치 풀기</Button></div>;if(phase==='ra-free')return <div className="axis-control-dock"><b>1 · 무게추 위치 조절</b><Range label="무게추 이동" value={values[4]} index={4} setValue={setValue}/><Button disabled={!raOk} onClick={()=>setPhase('dec-locked')}>{raOk?<Check/>:<CircleGauge/>} 적경축 다시 잠그기</Button></div>;if(phase==='dec-locked')return <div className="axis-control-dock"><b>2 · 적위축 균형</b><p>경통을 수평으로 놓고 적위축 클러치를 푸세요.</p><Button onClick={()=>setPhase('dec-free')}><RotateCw/> 적위축 클러치 풀기</Button></div>;if(phase==='dec-free')return <div className="axis-control-dock"><b>2 · 경통 앞뒤 위치 조절</b><Range label="경통 앞뒤 이동" value={values[5]} index={5} setValue={setValue}/><Button disabled={!decOk} onClick={()=>setPhase('complete')}>{decOk?<Check/>:<CircleGauge/>} 적위축 다시 잠그기</Button></div>;return <div className="axis-control-dock complete"><Check/><div><b>두 축 균형 확보</b><p>적경·적위 클러치가 모두 잠겼습니다.</p></div></div>}
+function FinderStageControls({phase,setPhase,values,setValue}:{phase:FinderPhase,setPhase:(p:FinderPhase)=>void,values:number[],setValue:(i:number,v:number)=>void}){const aligned=Math.abs(values[6]-50)<7&&Math.abs(values[7]-50)<7;if(phase==='rack')return <div className="finder-control-dock"><Move/><span>준비물대의 파인더를 경통 위 결합부로 이동하세요.</span></div>;if(phase==='snapped')return <div className="finder-control-dock"><b>파인더 안착 완료</b><p>파인더를 받친 채 고정 나사를 조이세요.</p><Button onClick={()=>setPhase('locked')}><RotateCw/> 고정 나사 조이기</Button></div>;if(phase==='locked')return <div className="finder-control-dock"><b>파인더 고정 완료</b><p>주경의 기준 별과 파인더 십자선을 비교합니다.</p><Button onClick={()=>setPhase('aligning')}><Eye/> 이중 시야 열기</Button></div>;if(phase==='aligning')return <div className="finder-control-dock align"><b>{aligned?'정렬 완료':'조절 나사를 돌려 십자선을 이동'}</b><div className="finder-screws"><button aria-label="십자선 왼쪽 이동" onClick={()=>setValue(6,Math.max(0,values[6]-6))}>←</button><button aria-label="십자선 오른쪽 이동" onClick={()=>setValue(6,Math.min(100,values[6]+6))}>→</button><button aria-label="십자선 위로 이동" onClick={()=>setValue(7,Math.max(0,values[7]-6))}>↑</button><button aria-label="십자선 아래로 이동" onClick={()=>setValue(7,Math.min(100,values[7]+6))}>↓</button></div><small>좌우 조절 나사 · 상하 조절 나사</small></div>;return <div className="finder-control-dock complete"><Check/><div><b>파인더 정렬 완료</b><p>주경과 파인더가 같은 별을 가리킵니다.</p></div></div>}
+function ObservationStageControls({phase,setPhase,focus,setValue}:{phase:ObservationPhase,setPhase:(p:ObservationPhase)=>void,focus:number,setValue:(i:number,v:number)=>void}){const error=Math.abs(focus-50);if(phase==='diagonal-rack'||phase==='eyepiece-rack')return <div className="observation-control-dock"><Move/><span>{phase==='diagonal-rack'?'천정미러를 포커서 뒤에 끼우세요.':'25mm 접안렌즈를 위쪽 소켓에 끼우세요.'}</span></div>;if(phase==='diagonal-snapped')return <div className="observation-control-dock"><b>천정미러 안착</b><p>회전하지 않도록 측면 나사를 조이세요.</p><Button onClick={()=>setPhase('diagonal-locked')}><RotateCw/> 고정 나사 조이기</Button></div>;if(phase==='diagonal-locked')return <div className="observation-control-dock"><Check/><div><b>천정미러 고정 완료</b><p>저배율 접안렌즈를 준비합니다.</p></div><Button onClick={()=>setPhase('eyepiece-rack')}>접안렌즈 꺼내기</Button></div>;if(phase==='eyepiece-snapped')return <div className="observation-control-dock"><b>접안렌즈 안착</b><p>작은 나사를 조여 접안렌즈를 고정하세요.</p><Button onClick={()=>setPhase('eyepiece-locked')}><RotateCw/> 접안렌즈 고정</Button></div>;if(phase==='eyepiece-locked')return <div className="observation-control-dock"><Check/><div><b>광학계 조립 완료</b><p>접안부를 들여다볼 준비가 됐습니다.</p></div><Button onClick={()=>setPhase('focusing')}><Eye/> 접안 시야 열기</Button></div>;if(phase==='focusing')return <div className="observation-control-dock focus-control"><div><b>{error<5?'정확한 초점 · 잠시 유지':error<14?'거의 선명합니다':'목성의 가장자리를 확인하세요'}</b><small>초점값 {focus} · 목표 50</small></div><div className="focus-buttons"><button aria-label="초점 안쪽으로" onClick={()=>setValue(8,Math.max(0,focus-3))}>−</button><input aria-label="초점 손잡이" type="range" min="0" max="100" value={focus} onChange={e=>setValue(8,+e.target.value)}/><button aria-label="초점 바깥쪽으로" onClick={()=>setValue(8,Math.min(100,focus+3))}>+</button></div></div>;return <div className="observation-control-dock complete"><Check/><div><b>목성 초점 확보</b><p>띠와 네 개의 갈릴레이 위성을 관측했습니다.</p></div></div>}
+function ObservationSequence({phase}:{phase:ObservationPhase}){const diagonalDone=!phase.startsWith('diagonal')||phase==='diagonal-locked';const eyepieceDone=phase==='eyepiece-locked'||phase==='focusing'||phase==='complete';return <div className="mini-sequence observation-sequence"><span className={diagonalDone?'done':''}>1 천정미러</span><span className={eyepieceDone?'done':''}>2 접안렌즈</span><span className={phase==='complete'?'done':''}>3 초점</span></div>}
+function FocusView({focus,complete}:{focus:number,complete:boolean}){const error=Math.abs(focus-50);const blur=Math.min(6,error/6);const scale=1+Math.min(.35,error/110);return <div className={`eyepiece-view observation-view ${complete?'focused':''}`}><div className="view-label"><Eye/> EYEPIECE · 25mm</div><div className="jupiter-system" style={{filter:`blur(${blur}px)`,transform:`scale(${scale})`}}><i className="moon m1"/><i className="moon m2"/><div className="jupiter"><i/><b/></div><i className="moon m3"/><i className="moon m4"/></div><small>{complete?'초점 고정 · 목성 관측 성공':error<5?'아주 선명합니다 · 그대로 유지하세요':focus<50?'바깥쪽으로 조금 더 돌리세요':'안쪽으로 조금 되돌리세요'}</small></div>}
+function TelescopeModel({stage,mountVisible,counterVisible,tubePhase,axisPhase,finderPhase,observationPhase}:{stage:number,counter:number,mountVisible:boolean,counterVisible:boolean,tubePhase:TubePhase,axisPhase:AxisPhase,finderPhase:FinderPhase,observationPhase:ObservationPhase}){const observationSrc=observationPhase==='diagonal-rack'?'/telescope-finder-installed-v1.png':observationPhase==='diagonal-snapped'||observationPhase==='diagonal-locked'||observationPhase==='eyepiece-rack'?'/telescope-diagonal-installed-v1.png':'/telescope-observation-ready-v1.png';const src=stage===1?(mountVisible?'/telescope-stage-02-v4.png':'/telescope-stage-01-v4.png'):stage===2?(counterVisible?'/telescope-stage-03-v4.png':'/telescope-stage-02-v4.png'):stage===3?(tubePhase==='rack'?'/telescope-stage-03-v4.png':tubePhase==='snapped'?'/telescope-stage-04-snapped-v2.png':'/telescope-stage-04-v4.png'):stage===4?(axisPhase==='ra-locked'?'/telescope-stage-04-v4.png':axisPhase==='ra-free'?'/telescope-balance-ra-v1.png':'/telescope-balance-dec-v1.png'):stage===5?(finderPhase==='rack'?'/telescope-stage-04-v4.png':'/telescope-finder-installed-v1.png'):observationSrc;return <div className={`telescope-pro cohesive-rig ${stage===3?`tube-${tubePhase}`:''} ${stage===4?`axis-${axisPhase}`:''} ${stage===5?`finder-${finderPhase}`:''} ${stage===6?`observation-${observationPhase}`:''}`}><img src={src} alt={`조립 ${stage+1}단계의 소형 굴절망원경`}/></div>}
 function Range({label,value,index,setValue}:{label:string,value:number,index:number,setValue:(i:number,v:number)=>void}){return <label>{label}<output>{value}</output><input aria-label={label} type="range" min="0" max="100" value={value} onChange={e=>setValue(index,+e.target.value)}/></label>}
 function ScrewDial({label,value,index,setValue}:{label:string,value:number,index:number,setValue:(i:number,v:number)=>void}){return <div className="screw-control"><button role="slider" aria-label={label} aria-valuemin={0} aria-valuemax={100} aria-valuenow={value} onClick={()=>setValue(index,Math.min(100,value+20))} onKeyDown={e=>{if(e.key==='ArrowRight'||e.key==='ArrowUp')setValue(index,Math.min(100,value+10));if(e.key==='ArrowLeft'||e.key==='ArrowDown')setValue(index,Math.max(0,value-10))}}><span style={{rotate:`${value*3.2}deg`}}><RotateCw/></span></button><div><b>{label}</b><small>{value>=85?'단단히 고정됨':`${value}% · 시계 방향으로 돌리기`}</small></div>{value>=85&&<Check/>}</div>}
-function Controls({stage,values,setValue,tripodPhase,setTripodPhase,mountPhase}:{stage:number,values:number[],setValue:(i:number,v:number)=>void,tripodPhase:TripodPhase,setTripodPhase:(p:TripodPhase)=>void,mountPhase:MountPhase}){
+function Controls({stage,values,setValue,tripodPhase,setTripodPhase,mountPhase,counterPhase,tubePhase='rack',setTubePhase}:{stage:number,values:number[],setValue:(i:number,v:number)=>void,tripodPhase:TripodPhase,setTripodPhase:(p:TripodPhase)=>void,mountPhase:MountPhase,counterPhase:CounterPhase,tubePhase?:TubePhase,setTubePhase?: (p:TubePhase)=>void}){
   if(stage===0){if(tripodPhase==='shelf')return <div className="drag-guide"><Move/><span>삼각대를 누른 채 설치 원까지 이동하세요.</span></div>;if(tripodPhase==='placed')return <Button className="action-button" variant="outline" onClick={()=>setTripodPhase('spread')}>세 다리 끝까지 펼치기</Button>;if(tripodPhase==='spread')return <Button className="action-button" variant="outline" onClick={()=>setTripodPhase('level')}><Eye/> 상부 수준기 들여다보기</Button>;return <><Range label="동쪽 다리 높이" value={values[0]} index={0} setValue={setValue}/><Range label="남쪽 다리 높이" value={values[9]} index={9} setValue={setValue}/></>}
   if(stage===1)return mountPhase==='rack'?<div className="drag-guide"><Move/><span>가대를 잡아 삼각대 상판으로 이동하세요.</span></div>:<div className="screw-controls"><ScrewDial label="삼각대 아래 중앙나사" value={values[1]} index={1} setValue={setValue}/><ScrewDial label="가대 측면 잠금나사" value={values[10]} index={10} setValue={setValue}/></div>;
-  if(stage===2)return <Range label="무게추 위치" value={values[2]} index={2} setValue={setValue}/>;
-  if(stage===3)return <Button className={`action-button ${values[3]?'installed':''}`} variant="outline" onClick={()=>setValue(3,1)}>{values[3]?<><Check/> 경통 잠금 완료</>:'경통을 안장 홈에 결합하기'}</Button>;
-  if(stage===4)return <><Range label="적경축 각도" value={values[4]} index={4} setValue={setValue}/><Range label="적위축 각도" value={values[5]} index={5} setValue={setValue}/></>;
-  if(stage===5)return <><Range label="파인더 좌우" value={values[6]} index={6} setValue={setValue}/><Range label="파인더 상하" value={values[7]} index={7} setValue={setValue}/></>;
-  return <Range label="초점 손잡이" value={values[8]} index={8} setValue={setValue}/>;
+  if(stage===2)return counterPhase==='rack'?<div className="drag-guide"><Move/><span>무게추를 가대의 봉으로 이동하세요.</span></div>:<Range label="무게추 위치" value={values[2]} index={2} setValue={setValue}/>;
+  if(stage===3)return tubePhase==='rack'?<div className="drag-guide"><Move/><span>경통을 가대 안장으로 이동하세요.</span></div>:<Button className={`action-button ${tubePhase==='locked'?'installed':''}`} variant="outline" onClick={()=>{setValue(3,1);setTubePhase?.('locked')}}>{tubePhase==='locked'?<><Check/> 경통 잠금 완료</>:'잠금 손잡이 조이기'}</Button>;
+  if(stage===4)return <div className="drag-guide"><CircleGauge/><span>망원경 옆 조작 패널에서 축 균형을 맞추세요.</span></div>;
+  if(stage===5)return <div className="drag-guide"><Eye/><span>작업 화면에서 파인더 설치와 정렬을 진행하세요.</span></div>;
+  return <div className="drag-guide"><Eye/><span>작업 화면에서 접안부 조립과 초점 맞추기를 진행하세요.</span></div>;
 }
