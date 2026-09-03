@@ -1,7 +1,14 @@
 import type { Metadata } from 'next';
 import './globals.css';
 
+const productionHost =
+  process.env.NEXT_PUBLIC_SITE_URL ??
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : 'http://localhost:3000');
+
 export const metadata: Metadata = {
+  metadataBase: new URL(productionHost),
   title: '망원경 설치 실험실 | Telescope Setup Lab',
   description: '중학생을 위한 7단계 망원경 설치 및 관측 시뮬레이션',
   openGraph: {

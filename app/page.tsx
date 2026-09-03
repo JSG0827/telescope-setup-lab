@@ -116,6 +116,7 @@ export default function Home() {
   const [observationDragging, setObservationDragging] = useState(false);
   const [observationDropHint, setObservationDropHint] = useState(false);
   const [complete, setComplete] = useState(false);
+  const [hasLoadedProgress, setHasLoadedProgress] = useState(false);
   const setValue = (index: number, value: number) =>
     setValues((v) => v.map((n, i) => (i === index ? value : n)));
 
@@ -157,8 +158,10 @@ export default function Home() {
         setObservationPhase(data.observationPhase ?? 'diagonal-rack');
         setComplete(Boolean(data.complete));
       } catch {}
+    setHasLoadedProgress(true);
   }, []);
   useEffect(() => {
+    if (!hasLoadedProgress) return;
     localStorage.setItem(
       'telescope-lab-progress',
       JSON.stringify({
@@ -175,6 +178,7 @@ export default function Home() {
       }),
     );
   }, [
+    hasLoadedProgress,
     stage,
     values,
     tripodPhase,
@@ -1024,7 +1028,7 @@ export default function Home() {
         />
         {stage === 6 ? (
           <ObservationSequence phase={observationPhase} />
-        ) : stage === 0 && tripodPhase !== 'level' ? (
+        ) : stage === 0 ? (
           <div className="mini-sequence">
             <span className={tripodPhase !== 'shelf' ? 'done' : ''}>
               1 위치
