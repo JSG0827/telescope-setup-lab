@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import './assembly-layout.css';
 
 const productionHost =
   process.env.NEXT_PUBLIC_SITE_URL ??
