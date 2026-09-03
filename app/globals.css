@@ -41,6 +41,219 @@
   }
 }
 
+/* Mechanical alignment system -------------------------------------------------
+   The telescope artwork and every interactive hotspot share this 2:3 frame.
+   Coordinates below are calibrated against the actual connection points in the
+   1024 × 1536 assembly artwork instead of the surrounding workbench. */
+.telescope-pro.cohesive-rig,
+.rig-anchor-layer {
+  left: 57%;
+  bottom: 2%;
+  width: 350px;
+  height: 525px;
+  transform: translateX(-50%);
+}
+.telescope-pro.cohesive-rig {
+  filter: drop-shadow(0 22px 20px #000c);
+}
+.rig-anchor-layer {
+  position: absolute;
+  z-index: 24;
+  pointer-events: none;
+}
+.rig-anchor-layer button,
+.rig-anchor-layer .axis-drag-hotspot {
+  pointer-events: auto;
+}
+
+.tripod-model.photo-tripod {
+  left: 57%;
+  bottom: 2%;
+  width: 310px !important;
+  height: 465px !important;
+  scale: 1 !important;
+}
+.tripod-model.photo-tripod img {
+  width: 100%;
+  height: 100%;
+  object-position: center bottom;
+}
+.ground-ring.installed {
+  left: 57%;
+  bottom: 1.5%;
+  width: 310px;
+  height: 82px;
+}
+
+/* STEP 02 — tripod plate and mount fasteners */
+.rig-anchor-layer .mount-drop-target {
+  left: 50%;
+  top: 6%;
+  width: 112px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+.rig-anchor-layer .mount-seat-highlight {
+  left: 50%;
+  top: 36%;
+  width: 102px;
+  height: 38px;
+  transform: translate(-50%, -50%);
+}
+.rig-anchor-layer .scene-screw.underside {
+  left: calc(50% - 22px);
+  top: 39%;
+}
+.rig-anchor-layer .scene-screw.side {
+  left: calc(64% - 22px);
+  top: 32%;
+}
+.rig-anchor-layer .mount-lock-status {
+  left: 50%;
+  bottom: 1%;
+}
+
+/* STEP 03 — exposed counterweight shaft */
+.rig-anchor-layer .counter-drop-target {
+  left: 39%;
+  top: 28%;
+  width: 80px;
+  height: 108px;
+  transform: translate(-50%, -50%) rotate(23deg);
+}
+.rig-anchor-layer .counter-drop-target i {
+  width: 70px;
+}
+
+/* STEP 04 — dovetail saddle, then its locking knob */
+.rig-anchor-layer .tube-drop-target {
+  left: 51%;
+  top: 4.5%;
+  width: 176px;
+  height: 54px;
+  transform: translate(-50%, -50%) rotate(7deg);
+}
+.rig-anchor-layer .tube-drop-target i {
+  width: 118px;
+  height: 14px;
+}
+.rig-anchor-layer .tube-clamp-highlight {
+  left: 53%;
+  top: 24%;
+  width: 62px;
+  height: 42px;
+  transform: translate(-50%, -50%);
+}
+
+/* STEP 05 — the draggable regions now sit directly on the moving parts. */
+.rig-anchor-layer .axis-drag-hotspot.ra {
+  left: 2%;
+  top: 30%;
+  width: 165px;
+  height: 78px;
+}
+.rig-anchor-layer .axis-drag-hotspot.dec {
+  left: 5%;
+  top: 5%;
+  width: 90%;
+  height: 82px;
+}
+
+/* STEP 06 — finder shoe on the rear tube ring */
+.rig-anchor-layer .finder-drop-target {
+  left: 78%;
+  top: 20%;
+  width: 118px;
+  height: 48px;
+  transform: translate(-50%, -50%) rotate(-14deg);
+}
+.rig-anchor-layer .finder-lock-highlight {
+  left: 70%;
+  top: 15%;
+  width: 40px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+}
+
+/* STEP 07 — focuser, diagonal socket, and the matching lock screw */
+.rig-anchor-layer .observation-drop-target {
+  left: 88%;
+  top: 28%;
+  width: 92px;
+  height: 60px;
+  transform: translate(-50%, -50%);
+}
+.rig-anchor-layer .observation-drop-target.eyepiece-target {
+  left: 91%;
+  top: 23%;
+  width: 72px;
+  height: 72px;
+  transform: translate(-50%, -50%);
+}
+.rig-anchor-layer .observation-lock-highlight {
+  left: 91%;
+  top: 28%;
+  transform: translate(-50%, -50%);
+}
+.rig-anchor-layer .observation-lock-highlight.eyepiece-lock {
+  left: 94%;
+  top: 23%;
+}
+
+@media (max-width: 1100px) {
+  .telescope-pro.cohesive-rig,
+  .rig-anchor-layer {
+    left: 62%;
+    width: 320px;
+    height: 480px;
+  }
+  .tripod-model.photo-tripod,
+  .ground-ring.installed {
+    left: 62%;
+  }
+  .tripod-model.photo-tripod {
+    width: 285px !important;
+    height: 428px !important;
+  }
+  .ground-ring.installed {
+    width: 285px;
+  }
+}
+
+@media (max-width: 680px) {
+  .telescope-pro.cohesive-rig,
+  .rig-anchor-layer {
+    left: 58%;
+    bottom: -4%;
+    width: 250px;
+    height: 375px;
+    scale: 1;
+  }
+  .tripod-model.photo-tripod {
+    left: 59%;
+    bottom: -2%;
+    width: 235px !important;
+    height: 352px !important;
+  }
+  .ground-ring.installed {
+    left: 59%;
+    width: 235px;
+    height: 62px;
+  }
+  .rig-anchor-layer .axis-drag-hotspot.ra {
+    left: 1%;
+    top: 30%;
+    width: 118px;
+    height: 58px;
+  }
+  .rig-anchor-layer .axis-drag-hotspot.dec {
+    left: 5%;
+    top: 5%;
+    width: 90%;
+    height: 58px;
+  }
+}
+
 .observation-rack .observation-slot:before {
   background: url('/star-diagonal-stylized-v1.png') center/contain no-repeat;
   border: 0;

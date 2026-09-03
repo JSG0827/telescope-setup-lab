@@ -329,10 +329,27 @@ export default function Home() {
                     title: '관측 자세 준비',
                     desc: '광학 부품이 모두 고정되었습니다. 접안부 시야를 열고 목성을 확인하세요.',
                   }
-                : {
-                    title: '목성에 초점 맞추기',
-                    desc: '초점 손잡이를 천천히 돌려 목성의 띠와 가장자리가 가장 또렷한 지점을 찾으세요.',
-                  };
+                  : {
+                      title: '목성에 초점 맞추기',
+                      desc: '초점 손잡이를 천천히 돌려 목성의 띠와 가장자리가 가장 또렷한 지점을 찾으세요.',
+                    };
+
+  const pointerInsideTarget = (
+    e: React.PointerEvent<HTMLDivElement>,
+    selector: string,
+    padding = 16,
+  ) => {
+    const target = e.currentTarget.parentElement
+      ?.querySelector<HTMLElement>(selector)
+      ?.getBoundingClientRect();
+    if (!target) return false;
+    return (
+      e.clientX >= target.left - padding &&
+      e.clientX <= target.right + padding &&
+      e.clientY >= target.top - padding &&
+      e.clientY <= target.bottom + padding
+    );
+  };
 
   const dragMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return;
@@ -341,10 +358,7 @@ export default function Home() {
     const x = e.clientX - bench.left - 58,
       y = e.clientY - bench.top - 95;
     setTripodPos({ x, y });
-    setDropHint(
-      Math.abs(e.clientX - (bench.left + bench.width * 0.57)) < 145 &&
-        e.clientY > bench.top + bench.height * 0.38,
-    );
+    setDropHint(pointerInsideTarget(e, '.drop-zone', 28));
   };
   const dragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging) return;
@@ -364,11 +378,7 @@ export default function Home() {
       x: e.clientX - bench.left - 72,
       y: e.clientY - bench.top - 90,
     });
-    setMountDropHint(
-      Math.abs(e.clientX - (bench.left + bench.width * 0.57)) < 120 &&
-        e.clientY > bench.top + bench.height * 0.24 &&
-        e.clientY < bench.top + bench.height * 0.66,
-    );
+    setMountDropHint(pointerInsideTarget(e, '.mount-drop-target', 22));
   };
   const mountDragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!mountDragging) return;
@@ -388,11 +398,7 @@ export default function Home() {
       x: e.clientX - bench.left - 52,
       y: e.clientY - bench.top - 70,
     });
-    setCounterDropHint(
-      Math.abs(e.clientX - (bench.left + bench.width * 0.57)) < 115 &&
-        e.clientY > bench.top + bench.height * 0.2 &&
-        e.clientY < bench.top + bench.height * 0.72,
-    );
+    setCounterDropHint(pointerInsideTarget(e, '.counter-drop-target', 20));
   };
   const counterDragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!counterDragging) return;
@@ -412,11 +418,7 @@ export default function Home() {
       x: e.clientX - bench.left - 90,
       y: e.clientY - bench.top - 55,
     });
-    setTubeDropHint(
-      Math.abs(e.clientX - (bench.left + bench.width * 0.57)) < 130 &&
-        e.clientY > bench.top + bench.height * 0.17 &&
-        e.clientY < bench.top + bench.height * 0.62,
-    );
+    setTubeDropHint(pointerInsideTarget(e, '.tube-drop-target', 22));
   };
   const tubeDragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!tubeDragging) return;
@@ -436,11 +438,7 @@ export default function Home() {
       x: e.clientX - bench.left - 72,
       y: e.clientY - bench.top - 48,
     });
-    setFinderDropHint(
-      Math.abs(e.clientX - (bench.left + bench.width * 0.57)) < 130 &&
-        e.clientY > bench.top + bench.height * 0.1 &&
-        e.clientY < bench.top + bench.height * 0.46,
-    );
+    setFinderDropHint(pointerInsideTarget(e, '.finder-drop-target', 18));
   };
   const finderDragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!finderDragging) return;
@@ -462,10 +460,7 @@ export default function Home() {
       y: e.clientY - bench.top - (isEyepiece ? 70 : 54),
     });
     setObservationDropHint(
-      Math.abs(e.clientX - (bench.left + bench.width * 0.68)) <
-        (isEyepiece ? 105 : 125) &&
-        e.clientY > bench.top + bench.height * 0.08 &&
-        e.clientY < bench.top + bench.height * 0.52,
+      pointerInsideTarget(e, '.observation-drop-target', isEyepiece ? 16 : 20),
     );
   };
   const observationDragEnd = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -632,14 +627,106 @@ export default function Home() {
             observationPhase={observationPhase}
           />
         )}
+        {stage > 0 && (
+          <div className={`rig-anchor-layer stage-${stage + 1}`}>
+            {stage === 1 && mountPhase === 'rack' && (
+              <div
+                className={`mount-drop-target ${mountDropHint ? 'ready' : ''}`}
+              >
+                <i />
+                <span>삼각대 상판</span>
+              </div>
+            )}
+            {stage === 1 && mountPhase !== 'rack' && (
+              <>
+                <div className="mount-seat-highlight" />
+                <button
+                  className={`scene-screw underside ${values[1] >= 85 ? 'tight' : ''}`}
+                  onClick={() => setValue(1, Math.min(100, values[1] + 20))}
+                  aria-label="삼각대 아래 중앙 고정나사 조이기"
+                  style={{ rotate: `${values[1] * 3.2}deg` }}
+                >
+                  <RotateCw />
+                </button>
+                <button
+                  className={`scene-screw side ${values[10] >= 85 ? 'tight' : ''}`}
+                  onClick={() => setValue(10, Math.min(100, values[10] + 20))}
+                  aria-label="가대 측면 방위 잠금나사 조이기"
+                  style={{ rotate: `${values[10] * 3.2}deg` }}
+                >
+                  <RotateCw />
+                </button>
+                <div className="mount-lock-status">
+                  <span className={values[1] >= 85 ? 'done' : ''}>하부 고정</span>
+                  <span className={values[10] >= 85 ? 'done' : ''}>측면 잠금</span>
+                </div>
+              </>
+            )}
+            {stage === 2 && counterPhase === 'rack' && (
+              <div
+                className={`counter-drop-target ${counterDropHint ? 'ready' : ''}`}
+              >
+                <i />
+                <span>무게추 봉 끝</span>
+              </div>
+            )}
+            {stage === 3 && tubePhase === 'rack' && (
+              <div className={`tube-drop-target ${tubeDropHint ? 'ready' : ''}`}>
+                <i />
+                <span>도브테일 안장</span>
+              </div>
+            )}
+            {stage === 3 && tubePhase === 'snapped' && (
+              <div className="tube-clamp-highlight" />
+            )}
+            {stage === 4 && (
+              <AxisDragSurface
+                phase={axisPhase}
+                value={axisPhase === 'ra-free' ? values[4] : values[5]}
+                setValue={setValue}
+              />
+            )}
+            {stage === 5 && finderPhase === 'rack' && (
+              <div
+                className={`finder-drop-target ${finderDropHint ? 'ready' : ''}`}
+              >
+                <i />
+                <span>파인더 슈</span>
+              </div>
+            )}
+            {stage === 5 && finderPhase === 'snapped' && (
+              <div className="finder-lock-highlight">
+                <RotateCw />
+              </div>
+            )}
+            {stage === 6 &&
+              (observationPhase === 'diagonal-rack' ||
+                observationPhase === 'eyepiece-rack') && (
+                <div
+                  className={`observation-drop-target ${observationPhase === 'eyepiece-rack' ? 'eyepiece-target' : ''} ${observationDropHint ? 'ready' : ''}`}
+                >
+                  <i />
+                  <span>
+                    {observationPhase === 'diagonal-rack'
+                      ? '포커서 결합부'
+                      : '접안렌즈 소켓'}
+                  </span>
+                </div>
+              )}
+            {stage === 6 &&
+              (observationPhase === 'diagonal-snapped' ||
+                observationPhase === 'eyepiece-snapped') && (
+                <div
+                  className={`observation-lock-highlight ${observationPhase.startsWith('eyepiece') ? 'eyepiece-lock' : ''}`}
+                >
+                  <RotateCw />
+                </div>
+              )}
+          </div>
+        )}
         {stage === 4 && (
           <>
             <AxisBalanceHUD phase={axisPhase} ra={values[4]} dec={values[5]} />
-            <AxisDragSurface
-              phase={axisPhase}
-              value={axisPhase === 'ra-free' ? values[4] : values[5]}
-              setValue={setValue}
-            />
             <AxisBalanceControls
               phase={axisPhase}
               setPhase={setAxisPhase}
@@ -684,12 +771,6 @@ export default function Home() {
               />
               <span>잡아서 드래그</span>
             </div>
-            <div
-              className={`mount-drop-target ${mountDropHint ? 'ready' : ''}`}
-            >
-              <i />
-              <span>가대 결합부</span>
-            </div>
           </>
         )}
         {stage === 2 && counterPhase === 'rack' && (
@@ -717,12 +798,6 @@ export default function Home() {
               <Grip />
               <CounterweightPiece />
               <span>잡아서 드래그</span>
-            </div>
-            <div
-              className={`counter-drop-target ${counterDropHint ? 'ready' : ''}`}
-            >
-              <i />
-              <span>무게추 봉</span>
             </div>
           </>
         )}
@@ -752,14 +827,7 @@ export default function Home() {
               <TubePiece />
               <span>양손으로 잡고 드래그</span>
             </div>
-            <div className={`tube-drop-target ${tubeDropHint ? 'ready' : ''}`}>
-              <i />
-              <span>도브테일 안장</span>
-            </div>
           </>
-        )}
-        {stage === 3 && tubePhase === 'snapped' && (
-          <div className="tube-clamp-highlight" />
         )}
         {stage === 5 && finderPhase === 'rack' && (
           <>
@@ -790,18 +858,7 @@ export default function Home() {
               />
               <span>잡아서 드래그</span>
             </div>
-            <div
-              className={`finder-drop-target ${finderDropHint ? 'ready' : ''}`}
-            >
-              <i />
-              <span>파인더 슈</span>
-            </div>
           </>
-        )}
-        {stage === 5 && finderPhase === 'snapped' && (
-          <div className="finder-lock-highlight">
-            <RotateCw />
-          </div>
         )}
         {stage === 5 && (
           <FinderStageControls
@@ -858,26 +915,7 @@ export default function Home() {
                 />
                 <span>잡아서 드래그</span>
               </div>
-              <div
-                className={`observation-drop-target ${observationPhase === 'eyepiece-rack' ? 'eyepiece-target' : ''} ${observationDropHint ? 'ready' : ''}`}
-              >
-                <i />
-                <span>
-                  {observationPhase === 'diagonal-rack'
-                    ? '포커서 결합부'
-                    : '접안렌즈 소켓'}
-                </span>
-              </div>
             </>
-          )}
-        {stage === 6 &&
-          (observationPhase === 'diagonal-snapped' ||
-            observationPhase === 'eyepiece-snapped') && (
-            <div
-              className={`observation-lock-highlight ${observationPhase.startsWith('eyepiece') ? 'eyepiece-lock' : ''}`}
-            >
-              <RotateCw />
-            </div>
           )}
         {stage === 6 && (
           <ObservationStageControls
@@ -886,31 +924,6 @@ export default function Home() {
             focus={values[8]}
             setValue={setValue}
           />
-        )}
-        {stage === 1 && mountPhase !== 'rack' && (
-          <>
-            <div className="mount-seat-highlight" />
-            <button
-              className={`scene-screw underside ${values[1] >= 85 ? 'tight' : ''}`}
-              onClick={() => setValue(1, Math.min(100, values[1] + 20))}
-              aria-label="삼각대 아래 중앙 고정나사 조이기"
-              style={{ rotate: `${values[1] * 3.2}deg` }}
-            >
-              <RotateCw />
-            </button>
-            <button
-              className={`scene-screw side ${values[10] >= 85 ? 'tight' : ''}`}
-              onClick={() => setValue(10, Math.min(100, values[10] + 20))}
-              aria-label="가대 측면 방위 잠금나사 조이기"
-              style={{ rotate: `${values[10] * 3.2}deg` }}
-            >
-              <RotateCw />
-            </button>
-            <div className="mount-lock-status">
-              <span className={values[1] >= 85 ? 'done' : ''}>하부 고정</span>
-              <span className={values[10] >= 85 ? 'done' : ''}>측면 잠금</span>
-            </div>
-          </>
         )}
         {stage === 0 && tripodPhase !== 'shelf' && tripodPhase !== 'level' && (
           <div className="ground-ring installed" />
