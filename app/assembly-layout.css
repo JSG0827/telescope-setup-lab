@@ -2,6 +2,13 @@
    The telescope artwork and every interactive hotspot share this 2:3 frame.
    Coordinates below are calibrated against the actual connection points in the
    1024 × 1536 assembly artwork instead of the surrounding workbench. */
+
+/* Keep equipment orientation readable without hiding the start action. */
+.equipment-intro { padding: 24px 0; }
+.equipment-intro .intro-card { width: min(760px, calc(100% - 32px)); padding: 28px; }
+.equipment-intro h1 { font-size: clamp(2rem, 4vw, 3rem); margin: 16px 0; }
+.equipment-intro .mission-meta { margin: 16px 0; }
+
 .telescope-pro.cohesive-rig,
 .rig-anchor-layer {
   left: 57%;

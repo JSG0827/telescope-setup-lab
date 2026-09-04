@@ -1,0 +1,33 @@
+.brief {
+  border-top: 1px solid #6fe7ff30;
+  margin: 0 0 20px;
+  padding-top: 16px;
+  text-align: left;
+}
+.brief h2, .brief h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #8aeaff;
+  margin: 0 0 6px;
+}
+.brief h3 { margin-top: 14px; }
+.brief p {
+  margin: 4px 0;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+.brief .equipment { font-size: 1rem; color: #f3f8ff; font-weight: 650; }
+.brief ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 24px;
+  list-style: disc;
+  padding-left: 18px;
+  color: #d4e4ef;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.brief .note { margin-top: 12px; font-size: 0.8125rem; color: #a4b8ca; }
+@media (max-width: 560px) {
+  .brief ul { grid-template-columns: 1fr; }
+}

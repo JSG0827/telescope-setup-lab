@@ -15,6 +15,11 @@ import {
   Trophy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { MissionBrief } from '@/components/mission-brief';
+import { TripodLesson } from '@/components/tripod-lesson';
+import { MountLesson } from '@/components/mount-lesson';
+import { createMount, restoreMount, mountReducer, mountReadiness, MOUNT_STORAGE_KEY, type MountAction } from '@/lib/mount';
+import { createTripod, restoreTripod, tripodReducer, tripodReadiness, TRIPOD_STORAGE_KEY, type TripodAction } from '@/lib/tripod';
 
 const stages = [
   '삼각대',
@@ -86,6 +91,9 @@ type ObservationPhase =
 const initial = [28, 0, 78, 0, 27, 72, 22, 76, 18, 72, 0];
 
 export default function Home() {
+  const [tripodLesson, setTripodLesson] = useState(createTripod);
+  const [mountLesson, setMountLesson] = useState(createMount);
+  const [legacyProgressAvailable, setLegacyProgressAvailable] = useState(false);
   const [started, setStarted] = useState(false);
   const [stage, setStage] = useState(0);
   const [values, setValues] = useState(initial);
@@ -121,11 +129,30 @@ export default function Home() {
     setValues((v) => v.map((n, i) => (i === index ? value : n)));
 
   useEffect(() => {
-    const saved = localStorage.getItem('telescope-lab-progress');
-    if (saved)
-      try {
+    try {
+      const currentSave = localStorage.getItem(MOUNT_STORAGE_KEY);
+      const saved = currentSave ?? localStorage.getItem(TRIPOD_STORAGE_KEY);
+      setLegacyProgressAvailable(!currentSave && (!!saved || !!localStorage.getItem('telescope-lab-progress')));
+      if (saved) {
         const data = JSON.parse(saved);
-        setStage(Math.min(data.stage ?? 0, 6));
+        const restored = restoreTripod(data.tripodLesson);
+        setTripodLesson(restored);
+        if (!tripodReadiness(restored).ready) {
+          setStage(0);
+          setHasLoadedProgress(true);
+          return;
+        }
+        const savedStage = Number.isInteger(data.stage) ? Math.max(0, Math.min(data.stage, 6)) : 0;
+        const restoredMount = restoreMount(currentSave ? data.mountLesson : null, restored);
+        setMountLesson(restoredMount);
+        setMountPhase(restoredMount.placed ? (restoredMount.fixationChecked ? 'secured' : 'snapped') : 'rack');
+        if (!mountReadiness(restoredMount, restored).ready) {
+          setStage(Math.min(savedStage, 1));
+          setTripodPhase('level');
+          setHasLoadedProgress(true);
+          return;
+        }
+        setStage(tripodReadiness(restored).ready ? Math.max(0, Math.min(data.stage ?? 0, 6)) : 0);
         setValues(
           initial.map((n, i) =>
             typeof data.values?.[i] === 'number' ? data.values[i] : n,
@@ -133,11 +160,6 @@ export default function Home() {
         );
         setTripodPhase(
           data.tripodPhase ?? ((data.stage ?? 0) > 0 ? 'level' : 'shelf'),
-        );
-        const savedMount =
-          data.mountPhase === 'placed' ? 'secured' : data.mountPhase;
-        setMountPhase(
-          savedMount ?? ((data.stage ?? 0) > 1 ? 'secured' : 'rack'),
         );
         const savedCounter =
           data.counterPhase === 'installed' && (data.stage ?? 0) > 2
@@ -156,15 +178,18 @@ export default function Home() {
           data.finderPhase ?? ((data.stage ?? 0) > 5 ? 'complete' : 'rack'),
         );
         setObservationPhase(data.observationPhase ?? 'diagonal-rack');
-        setComplete(Boolean(data.complete));
-      } catch {}
+        setComplete(Boolean(data.complete) && tripodReadiness(restored).ready);
+      }
+    } catch {}
     setHasLoadedProgress(true);
   }, []);
   useEffect(() => {
     if (!hasLoadedProgress) return;
-    localStorage.setItem(
-      'telescope-lab-progress',
+    try { localStorage.setItem(
+      MOUNT_STORAGE_KEY,
       JSON.stringify({
+        tripodLesson,
+        mountLesson,
         stage,
         values,
         tripodPhase,
@@ -176,8 +201,10 @@ export default function Home() {
         observationPhase,
         complete,
       }),
-    );
+    ); } catch { /* The lesson still works when browser storage is unavailable. */ }
   }, [
+    tripodLesson,
+    mountLesson,
     hasLoadedProgress,
     stage,
     values,
@@ -198,15 +225,6 @@ export default function Home() {
       setObservationDropHint(false);
     }
   };
-  useEffect(() => {
-    if (
-      stage === 1 &&
-      mountPhase === 'snapped' &&
-      values[1] >= 85 &&
-      values[10] >= 85
-    )
-      setMountPhase('secured');
-  }, [stage, mountPhase, values]);
   useEffect(() => {
     if (
       stage === 5 &&
@@ -259,6 +277,8 @@ export default function Home() {
   );
 
   const reset = () => {
+    setTripodLesson(createTripod());
+    setMountLesson(createMount());
     setStage(0);
     setValues(initial);
     setTripodPhase('shelf');
@@ -275,7 +295,16 @@ export default function Home() {
     setObservationPhase('diagonal-rack');
     setObservationPos({ x: 42, y: 160 });
     setComplete(false);
-    localStorage.removeItem('telescope-lab-progress');
+    try { localStorage.removeItem(MOUNT_STORAGE_KEY); } catch {}
+  };
+  const actOnTripod = (action: TripodAction) => {
+    const payloadMounted = mountLesson.placed || counterPhase !== 'rack' || tubePhase !== 'rack';
+    setTripodLesson(current => tripodReducer(current, payloadMounted && !['view', 'select', 'hint', 'check'].includes(action.type) ? { type: 'mounted-guard' } : action));
+  };
+  const actOnMount = (action: MountAction) => {
+    const result = mountReducer(mountLesson, action, tripodLesson, counterPhase !== 'rack' || tubePhase !== 'rack');
+    setMountLesson(result);
+    setMountPhase(result.placed ? (result.fixationChecked ? 'secured' : 'snapped') : 'rack');
   };
   const next = () => (stage === 6 ? setComplete(true) : setStage((s) => s + 1));
   const phaseCopy =
@@ -480,7 +509,7 @@ export default function Home() {
 
   if (!started)
     return (
-      <main className="sim-shell intro">
+      <main className="sim-shell intro equipment-intro">
         <section className="intro-card glass">
           <div className="eyebrow">
             <Sparkles size={14} /> ASTRONOMY FIELD LAB · MISSION 01
@@ -492,13 +521,15 @@ export default function Home() {
           </h1>
           <p>
             준비물대에서 장비를 꺼내고 수평과 균형을 맞춰, 첫 천체 관측까지
-            완성하는 실전 시뮬레이션입니다.
+            기본 조작을 연습하는 교육용 시뮬레이션입니다.
           </p>
           <div className="mission-meta">
             <span>예상 12분</span>
             <span>중학교 영재 수업</span>
             <span>직접 조작</span>
           </div>
+          <MissionBrief />
+          {legacyProgressAvailable && <p>1·2단계 실습이 업데이트되었습니다. 이전 기록은 별도로 보관하며, 새 삼각대 실습의 유효한 기록만 이어받습니다. 가대는 새 고정·방향 확인을 진행하세요.</p>}
           <Button className="launch" onClick={() => setStarted(true)}>
             관측 임무 시작 <ChevronRight />
           </Button>
@@ -512,7 +543,7 @@ export default function Home() {
     );
 
   return (
-    <main className="sim-shell">
+    <main className={`sim-shell ${stage <= 1 ? 'tripod-mode' : ''}`}>
       <header className="topbar glass">
         <div className="brand">
           <span className="brand-icon">✦</span>
@@ -556,6 +587,15 @@ export default function Home() {
         ))}
       </aside>
 
+      {stage === 0 ? <TripodLesson state={tripodLesson} payloadAttached={mountLesson.placed} onAction={actOnTripod} onAdvance={() => {
+        if (!tripodReadiness(tripodLesson).ready) return;
+        setTripodPhase('level');
+        setStage(1);
+      }} /> : stage === 1 ? <MountLesson state={mountLesson} tripod={tripodLesson} onAction={actOnMount} onBack={() => setStage(0)} onAdvance={() => {
+        if (!mountReadiness(mountLesson, tripodLesson).ready) return;
+        setMountPhase('secured');
+        setStage(2);
+      }} /> : <>
       <section
         className={`workbench ${stage === 0 && tripodPhase === 'level' ? 'level-camera' : ''}`}
       >
@@ -1095,6 +1135,7 @@ export default function Home() {
         </Button>
       </aside>
 
+      </>}
       {complete && (
         <div className="complete-overlay">
           <section className="complete-card glass">
@@ -1109,8 +1150,8 @@ export default function Home() {
               <div className="eyebrow">MISSION COMPLETE</div>
               <h2>첫 관측에 성공했어요!</h2>
               <p>
-                삼각대 수평부터 접안부 초점까지 실제 설치 순서를 모두
-                완성했습니다.
+                삼각대 수평부터 접안부 초점까지 이번 실습의 7단계를
+                완성했습니다. 실제 장비의 설치 절차는 해당 설명서를 확인하세요.
               </p>
               <div className="achievement-row">
                 <span>

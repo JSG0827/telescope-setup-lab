@@ -10,6 +10,9 @@
     "build": "next build && node scripts/verify-assembly-build.mjs",
     "start": "next start",
     "lint": "oxlint",
+    "test:curriculum": "node --experimental-strip-types --test scripts/curriculum.test.mjs",
+    "test:tripod": "node --experimental-strip-types --test scripts/tripod.test.mjs",
+    "test:mount": "node --experimental-strip-types --test scripts/mount.test.mjs",
     "format": "oxfmt"
   },
   "dependencies": {

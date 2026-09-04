@@ -7,3 +7,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+## Project direction and handoff
+
+Before changing this telescope simulator, read `docs/DEVELOPMENT_DIRECTION.md`
+and `docs/CURRICULUM_V2.md`. They preserve the user's agreed educational direction,
+provisional equipment assumptions, implementation status, and next steps.
+Keep planned capabilities distinct from implemented ones; update the work record
+when a milestone is actually verified. Preserve the Next.js rules above.
