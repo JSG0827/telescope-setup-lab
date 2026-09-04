@@ -1,0 +1,11 @@
+.rig { position:absolute; top:75px; right:0; width:70%; height:calc(100% - 175px); }.detail { width:72%; right:0; }
+.rack { position:absolute; z-index:7; left:16px; top:100px; width:180px; padding:12px; display:grid; gap:8px; border:1px solid #587f98; border-radius:12px; background:#0a2238ed; color:#d9edf4; font-size:.875rem; }.rack small { line-height:1.6; font-size:.8125rem; }
+.dragPart { width:156px; height:118px; touch-action:none; cursor:grab; border-radius:8px; }.dragPart svg { width:100%; height:100%; pointer-events:none; }.dragPart:focus-visible { outline:3px solid #a1ecff; }
+.marker { fill:#0c3b4e; stroke:#b1faff; stroke-width:12; }.target { fill:#4cd7ef22; stroke:#9ff4ff; stroke-width:5; stroke-dasharray:9 7; }.over { fill:#71f6bd77; stroke-dasharray:none; }.label { fill:#c7f0ff; font-size:38px; paint-order:stroke; stroke:#092031; stroke-width:5; }
+.hotspot { cursor:pointer; }.hotspot circle { fill:#6cddff22; stroke:#a3ecff; stroke-width:5; }.hotspot path { stroke:#ffdd8c; stroke-width:8; }.hotspot:focus { outline:none; }.hotspot:focus circle { stroke:#ffe5a0; stroke-width:9; }
+.seatedLine,.looseLine { fill:none; stroke-width:5; pointer-events:none; }.seatedLine { stroke:#9cf4c6; }.looseLine { stroke:#ffcf80; stroke-dasharray:8 8; }
+.status { position:absolute; bottom:128px; left:18px; right:18px; display:flex; flex-wrap:wrap; gap:8px 20px; padding:10px; color:#d7eff5; background:#071c30e8; border-radius:8px; font-size:.875rem; }
+.choices { display:flex; flex-wrap:wrap; gap:5px; }.choices button { flex:1; }.note,.mobileFeedback { padding:12px; background:#19384c; border-radius:8px; }.mobileFeedback { display:none; }
+@media(max-width:1000px) { .choices { grid-column:1/-1; }.mobileFeedback { display:block; } }
+@media(max-width:560px) { .rack { top:110px; left:10px; width:165px; padding:8px; }.dragPart { width:146px; height:110px; }.rig { top:290px; width:92%; height:230px; }.detail { width:98%; top:310px; height:210px; }.status { bottom:145px; left:10px; right:10px; font-size:.8125rem; }.label { font-size:44px; } }
+@media(max-width:560px) { .rig.installed { top:120px; height:350px; width:98%; } }

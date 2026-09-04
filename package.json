@@ -13,6 +13,9 @@
     "test:curriculum": "node --experimental-strip-types --test scripts/curriculum.test.mjs",
     "test:tripod": "node --experimental-strip-types --test scripts/tripod.test.mjs",
     "test:mount": "node --experimental-strip-types --test scripts/mount.test.mjs",
+    "test:counterweight": "node --experimental-strip-types --test scripts/counterweight.test.mjs",
+    "test:tube": "node --experimental-strip-types --test scripts/tube.test.mjs",
+    "test:observing": "node --experimental-strip-types --test scripts/observing-setup.test.mjs",
     "format": "oxfmt"
   },
   "dependencies": {

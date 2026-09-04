@@ -18,6 +18,13 @@ import { Button } from '@/components/ui/button';
 import { MissionBrief } from '@/components/mission-brief';
 import { TripodLesson } from '@/components/tripod-lesson';
 import { MountLesson } from '@/components/mount-lesson';
+import { CounterweightLesson } from '@/components/counterweight-lesson';
+import { TubeLesson } from '@/components/tube-lesson';
+import { ObservingLesson } from '@/components/observing-lesson';
+import { ObservingRig } from '@/components/observing-art';
+import { createSetup, restoreSetup, setupReducer, setupReady, SETUP_STORAGE_KEY, PARTS, type SetupAction } from '@/lib/observing-setup';
+import { createTube, restoreTube, tubeReducer, tubeReadiness, TUBE_STORAGE_KEY, type TubeAction } from '@/lib/tube';
+import { createCounterweight, restoreCounterweight, counterweightReducer, counterweightReadiness, COUNTERWEIGHT_STORAGE_KEY, type CounterweightAction } from '@/lib/counterweight';
 import { createMount, restoreMount, mountReducer, mountReadiness, MOUNT_STORAGE_KEY, type MountAction } from '@/lib/mount';
 import { createTripod, restoreTripod, tripodReducer, tripodReadiness, TRIPOD_STORAGE_KEY, type TripodAction } from '@/lib/tripod';
 
@@ -26,8 +33,8 @@ const stages = [
   '가대',
   '무게추',
   '경통',
-  '축 균형',
-  '파인더',
+  '부속품·축 균형',
+  '파인더 정렬',
   '초점',
 ];
 const info = [
@@ -93,6 +100,9 @@ const initial = [28, 0, 78, 0, 27, 72, 22, 76, 18, 72, 0];
 export default function Home() {
   const [tripodLesson, setTripodLesson] = useState(createTripod);
   const [mountLesson, setMountLesson] = useState(createMount);
+  const [counterweightLesson, setCounterweightLesson] = useState(createCounterweight);
+  const [tubeLesson, setTubeLesson] = useState(createTube);
+  const [observingSetup, setObservingSetup] = useState(() => createSetup());
   const [legacyProgressAvailable, setLegacyProgressAvailable] = useState(false);
   const [started, setStarted] = useState(false);
   const [stage, setStage] = useState(0);
@@ -129,9 +139,16 @@ export default function Home() {
     setValues((v) => v.map((n, i) => (i === index ? value : n)));
 
   useEffect(() => {
+    if (started) window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [stage, started]);
+
+  useEffect(() => {
     try {
-      const currentSave = localStorage.getItem(MOUNT_STORAGE_KEY);
-      const saved = currentSave ?? localStorage.getItem(TRIPOD_STORAGE_KEY);
+      const currentSave = localStorage.getItem(SETUP_STORAGE_KEY);
+      const tubeSave = localStorage.getItem(TUBE_STORAGE_KEY);
+      const counterSave = localStorage.getItem(COUNTERWEIGHT_STORAGE_KEY);
+      const mountSave = localStorage.getItem(MOUNT_STORAGE_KEY);
+      const saved = currentSave ?? tubeSave ?? counterSave ?? mountSave ?? localStorage.getItem(TRIPOD_STORAGE_KEY);
       setLegacyProgressAvailable(!currentSave && (!!saved || !!localStorage.getItem('telescope-lab-progress')));
       if (saved) {
         const data = JSON.parse(saved);
@@ -143,7 +160,7 @@ export default function Home() {
           return;
         }
         const savedStage = Number.isInteger(data.stage) ? Math.max(0, Math.min(data.stage, 6)) : 0;
-        const restoredMount = restoreMount(currentSave ? data.mountLesson : null, restored);
+        const restoredMount = restoreMount(currentSave || tubeSave || counterSave || mountSave ? data.mountLesson : null, restored);
         setMountLesson(restoredMount);
         setMountPhase(restoredMount.placed ? (restoredMount.fixationChecked ? 'secured' : 'snapped') : 'rack');
         if (!mountReadiness(restoredMount, restored).ready) {
@@ -152,7 +169,34 @@ export default function Home() {
           setHasLoadedProgress(true);
           return;
         }
-        setStage(tripodReadiness(restored).ready ? Math.max(0, Math.min(data.stage ?? 0, 6)) : 0);
+        const restoredCounter = restoreCounterweight(currentSave || tubeSave || counterSave ? data.counterweightLesson : null, restoredMount, restored);
+        if (!currentSave && restoredCounter.checked) restoredCounter.feedback = '이전 실습의 무게추 고정을 이어받았습니다. 관측 부속품과 균형은 새 실습에서 확인합니다.';
+        setCounterweightLesson(restoredCounter);
+        setCounterPhase(restoredCounter.placed ? (restoredCounter.checked ? 'secured' : 'installed') : 'rack');
+        if (!counterweightReadiness(restoredCounter, restoredMount, restored).ready) {
+          setStage(Math.min(savedStage, 2));
+          setTripodPhase('level');
+          setHasLoadedProgress(true);
+          return;
+        }
+        const restoredTube = restoreTube(currentSave || tubeSave ? data.tubeLesson : null, restoredCounter, restoredMount, restored);
+        setTubeLesson(restoredTube);
+        setTubePhase(restoredTube.placed ? (restoredTube.checked ? 'locked' : 'snapped') : 'rack');
+        if (!tubeReadiness(restoredTube, restoredCounter, restoredMount, restored).ready) {
+          setStage(Math.min(savedStage, 3));
+          setTripodPhase('level');
+          setHasLoadedProgress(true);
+          return;
+        }
+        const restoredSetup = restoreSetup(currentSave ? data.observingSetup : null, restoredCounter.position, true);
+        setObservingSetup(restoredSetup);
+        if (!setupReady(restoredSetup)) {
+          setStage(Math.min(savedStage, 4));
+          setTripodPhase('level');
+          setHasLoadedProgress(true);
+          return;
+        }
+        setStage(savedStage);
         setValues(
           initial.map((n, i) =>
             typeof data.values?.[i] === 'number' ? data.values[i] : n,
@@ -161,24 +205,12 @@ export default function Home() {
         setTripodPhase(
           data.tripodPhase ?? ((data.stage ?? 0) > 0 ? 'level' : 'shelf'),
         );
-        const savedCounter =
-          data.counterPhase === 'installed' && (data.stage ?? 0) > 2
-            ? 'secured'
-            : data.counterPhase;
-        setCounterPhase(
-          savedCounter ?? ((data.stage ?? 0) > 2 ? 'secured' : 'rack'),
-        );
-        setTubePhase(
-          data.tubePhase ?? ((data.stage ?? 0) > 3 ? 'locked' : 'rack'),
-        );
-        setAxisPhase(
-          data.axisPhase ?? ((data.stage ?? 0) > 4 ? 'complete' : 'ra-locked'),
-        );
+        setAxisPhase('complete');
         setFinderPhase(
-          data.finderPhase ?? ((data.stage ?? 0) > 5 ? 'complete' : 'rack'),
+          ['aligning','complete'].includes(data.finderPhase) ? data.finderPhase : 'aligning',
         );
-        setObservationPhase(data.observationPhase ?? 'diagonal-rack');
-        setComplete(Boolean(data.complete) && tripodReadiness(restored).ready);
+        setObservationPhase(['eyepiece-locked','focusing','complete'].includes(data.observationPhase) ? data.observationPhase : 'eyepiece-locked');
+        setComplete(Boolean(data.complete) && setupReady(restoredSetup) && data.finderPhase === 'complete' && data.observationPhase === 'complete');
       }
     } catch {}
     setHasLoadedProgress(true);
@@ -186,10 +218,13 @@ export default function Home() {
   useEffect(() => {
     if (!hasLoadedProgress) return;
     try { localStorage.setItem(
-      MOUNT_STORAGE_KEY,
+      SETUP_STORAGE_KEY,
       JSON.stringify({
         tripodLesson,
         mountLesson,
+        counterweightLesson,
+        tubeLesson,
+        observingSetup,
         stage,
         values,
         tripodPhase,
@@ -205,6 +240,9 @@ export default function Home() {
   }, [
     tripodLesson,
     mountLesson,
+    counterweightLesson,
+    tubeLesson,
+    observingSetup,
     hasLoadedProgress,
     stage,
     values,
@@ -252,11 +290,9 @@ export default function Home() {
       [
         tripodPhase === 'level' && levelPassed,
         mountPhase === 'secured',
-        counterPhase === 'secured',
-        tubePhase === 'locked' && values[3] === 1,
-        axisPhase === 'complete' &&
-          Math.abs(values[4] - 50) < 6 &&
-          Math.abs(values[5] - 50) < 6,
+        counterweightReadiness(counterweightLesson, mountLesson, tripodLesson).ready,
+        tubeReadiness(tubeLesson, counterweightLesson, mountLesson, tripodLesson).ready,
+        setupReady(observingSetup),
         finderPhase === 'complete' &&
           Math.abs(values[6] - 50) < 7 &&
           Math.abs(values[7] - 50) < 7,
@@ -268,7 +304,12 @@ export default function Home() {
       tripodPhase,
       mountPhase,
       counterPhase,
+      counterweightLesson,
+      mountLesson,
+      tripodLesson,
       tubePhase,
+      tubeLesson,
+      observingSetup,
       axisPhase,
       finderPhase,
       observationPhase,
@@ -279,6 +320,9 @@ export default function Home() {
   const reset = () => {
     setTripodLesson(createTripod());
     setMountLesson(createMount());
+    setCounterweightLesson(createCounterweight());
+    setTubeLesson(createTube());
+    setObservingSetup(createSetup());
     setStage(0);
     setValues(initial);
     setTripodPhase('shelf');
@@ -295,7 +339,7 @@ export default function Home() {
     setObservationPhase('diagonal-rack');
     setObservationPos({ x: 42, y: 160 });
     setComplete(false);
-    try { localStorage.removeItem(MOUNT_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(SETUP_STORAGE_KEY); } catch {}
   };
   const actOnTripod = (action: TripodAction) => {
     const payloadMounted = mountLesson.placed || counterPhase !== 'rack' || tubePhase !== 'rack';
@@ -305,6 +349,20 @@ export default function Home() {
     const result = mountReducer(mountLesson, action, tripodLesson, counterPhase !== 'rack' || tubePhase !== 'rack');
     setMountLesson(result);
     setMountPhase(result.placed ? (result.fixationChecked ? 'secured' : 'snapped') : 'rack');
+  };
+  const actOnCounterweight = (action: CounterweightAction) => {
+    const result = counterweightReducer(counterweightLesson, action, mountLesson, tripodLesson, tubePhase !== 'rack');
+    setCounterweightLesson(result);
+    setCounterPhase(result.placed ? (result.checked ? 'secured' : 'installed') : 'rack');
+  };
+  const laterTubeWork = PARTS.some(p => observingSetup.parts[p] !== 'rack') || axisPhase !== 'ra-locked' || finderPhase !== 'rack' || observationPhase !== 'diagonal-rack';
+  const actOnSetup = (action: SetupAction) => {
+    setObservingSetup(current => setupReducer(current, action, tubeReadiness(tubeLesson, counterweightLesson, mountLesson, tripodLesson).ready, finderPhase !== 'rack'));
+  };
+  const actOnTube = (action: TubeAction) => {
+    const result = tubeReducer(tubeLesson, action, counterweightLesson, mountLesson, tripodLesson, laterTubeWork);
+    setTubeLesson(result);
+    setTubePhase(result.placed ? (result.checked ? 'locked' : 'snapped') : 'rack');
   };
   const next = () => (stage === 6 ? setComplete(true) : setStage((s) => s + 1));
   const phaseCopy =
@@ -529,7 +587,7 @@ export default function Home() {
             <span>직접 조작</span>
           </div>
           <MissionBrief />
-          {legacyProgressAvailable && <p>1·2단계 실습이 업데이트되었습니다. 이전 기록은 별도로 보관하며, 새 삼각대 실습의 유효한 기록만 이어받습니다. 가대는 새 고정·방향 확인을 진행하세요.</p>}
+          {legacyProgressAvailable && <p>부속품을 먼저 장착한 뒤 균형을 맞추는 실습으로 바뀌었습니다. 이전 기록은 별도로 보관하며 유효한 1~4단계 기록을 이어받습니다. 새 부속품·균형 확인을 진행하세요.</p>}
           <Button className="launch" onClick={() => setStarted(true)}>
             관측 임무 시작 <ChevronRight />
           </Button>
@@ -543,7 +601,7 @@ export default function Home() {
     );
 
   return (
-    <main className={`sim-shell ${stage <= 1 ? 'tripod-mode' : ''}`}>
+    <main className={`sim-shell ${stage <= 4 ? 'tripod-mode' : ''}`}>
       <header className="topbar glass">
         <div className="brand">
           <span className="brand-icon">✦</span>
@@ -595,6 +653,22 @@ export default function Home() {
         if (!mountReadiness(mountLesson, tripodLesson).ready) return;
         setMountPhase('secured');
         setStage(2);
+      }} /> : stage === 2 ? <CounterweightLesson state={counterweightLesson} tripod={tripodLesson} mount={mountLesson} tubeAttached={tubeLesson.placed} tube={tubeLesson} observing={observingSetup.events.length ? observingSetup : undefined} onAction={actOnCounterweight} onBack={() => setStage(1)} onAdvance={() => {
+        if (!counterweightReadiness(counterweightLesson, mountLesson, tripodLesson).ready) return;
+        setCounterPhase('secured');
+        setStage(3);
+      }} /> : stage === 3 ? <TubeLesson state={tubeLesson} counter={counterweightLesson} mount={mountLesson} tripod={tripodLesson} observing={observingSetup.events.length ? observingSetup : undefined} laterWork={laterTubeWork} onAction={actOnTube} onBack={() => setStage(2)} onAdvance={() => {
+        if (!tubeReadiness(tubeLesson, counterweightLesson, mountLesson, tripodLesson).ready) return;
+        setTubePhase('locked');
+        setValue(3, 1);
+        if (!observingSetup.events.length) setObservingSetup(createSetup(counterweightLesson.position));
+        setStage(4);
+      }} /> : stage === 4 ? <ObservingLesson state={observingSetup} tripod={tripodLesson} readOnly={finderPhase !== 'rack'} prerequisite={tubeReadiness(tubeLesson,counterweightLesson,mountLesson,tripodLesson).ready} onAction={actOnSetup} onBack={() => setStage(3)} onAdvance={() => {
+        if (!setupReady(observingSetup)) return;
+        setAxisPhase('complete');
+        if (finderPhase === 'rack') setFinderPhase('aligning');
+        if (observationPhase === 'diagonal-rack') setObservationPhase('eyepiece-locked');
+        setStage(5);
       }} /> : <>
       <section
         className={`workbench ${stage === 0 && tripodPhase === 'level' ? 'level-camera' : ''}`}
@@ -624,8 +698,6 @@ export default function Home() {
         {stage === 1 && <MountRack empty={mountPhase !== 'rack'} />}
         {stage === 2 && <CounterweightRack empty={counterPhase !== 'rack'} />}
         {stage === 3 && <TubeRack empty={tubePhase !== 'rack'} />}
-        {stage === 5 && <FinderRack empty={finderPhase !== 'rack'} />}
-        {stage === 6 && <ObservationRack phase={observationPhase} />}
         {stage === 0 && tripodPhase === 'shelf' && (
           <div
             role="button"
@@ -655,7 +727,7 @@ export default function Home() {
         {stage === 0 && tripodPhase !== 'shelf' && tripodPhase !== 'level' && (
           <TripodModel folded={tripodPhase === 'placed'} tiltX={0} tiltY={0} />
         )}
-        {stage > 0 && (
+        {stage >= 5 ? <div className="telescope-pro cohesive-rig"><ObservingRig state={observingSetup} tripod={tripodLesson}/></div> : stage > 0 && (
           <TelescopeModel
             stage={stage}
             counter={values[2]}
@@ -1829,9 +1901,7 @@ function TelescopeModel({
                 ? '/telescope-balance-ra-v1.png'
                 : '/telescope-balance-dec-v1.png'
             : stage === 5
-              ? finderPhase === 'rack'
-                ? '/telescope-stage-04-v4.png'
-                : '/telescope-finder-installed-v1.png'
+              ? '/telescope-observation-ready-v1.png'
               : observationSrc;
   return (
     <div
@@ -2052,13 +2122,13 @@ function Controls({
     return (
       <div className="drag-guide">
         <Eye />
-        <span>작업 화면에서 파인더 설치와 정렬을 진행하세요.</span>
+        <span>파인더는 STEP 05에서 고정했습니다. 작업 화면에서 정렬을 진행하세요.</span>
       </div>
     );
   return (
     <div className="drag-guide">
       <Eye />
-      <span>작업 화면에서 접안부 조립과 초점 맞추기를 진행하세요.</span>
+        <span>천정미러·접안렌즈는 STEP 05에서 고정했습니다. 접안 시야를 열고 초점을 맞추세요.</span>
     </div>
   );
 }
