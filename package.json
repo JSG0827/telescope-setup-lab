@@ -16,6 +16,8 @@
     "test:counterweight": "node --experimental-strip-types --test scripts/counterweight.test.mjs",
     "test:tube": "node --experimental-strip-types --test scripts/tube.test.mjs",
     "test:observing": "node --experimental-strip-types --test scripts/observing-setup.test.mjs",
+    "test:alignment": "node --experimental-strip-types --test scripts/alignment.test.mjs",
+    "test:focus": "node --experimental-strip-types --test scripts/focus.test.mjs",
     "format": "oxfmt"
   },
   "dependencies": {

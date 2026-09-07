@@ -12,7 +12,6 @@ import {
   RotateCcw,
   RotateCw,
   Sparkles,
-  Trophy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MissionBrief } from '@/components/mission-brief';
@@ -21,6 +20,10 @@ import { MountLesson } from '@/components/mount-lesson';
 import { CounterweightLesson } from '@/components/counterweight-lesson';
 import { TubeLesson } from '@/components/tube-lesson';
 import { ObservingLesson } from '@/components/observing-lesson';
+import { AlignmentLesson } from '@/components/alignment-lesson';
+import { FocusLesson } from '@/components/focus-lesson';
+import { createFocus, restoreFocus, focusReducer, focusReady, FOCUS_STORAGE_KEY, type FocusAction } from '@/lib/focus';
+import { createAlignment, restoreAlignment, alignmentReducer, alignmentReady, ALIGNMENT_STORAGE_KEY, type AlignmentAction } from '@/lib/alignment';
 import { ObservingRig } from '@/components/observing-art';
 import { createSetup, restoreSetup, setupReducer, setupReady, SETUP_STORAGE_KEY, PARTS, type SetupAction } from '@/lib/observing-setup';
 import { createTube, restoreTube, tubeReducer, tubeReadiness, TUBE_STORAGE_KEY, type TubeAction } from '@/lib/tube';
@@ -103,6 +106,8 @@ export default function Home() {
   const [counterweightLesson, setCounterweightLesson] = useState(createCounterweight);
   const [tubeLesson, setTubeLesson] = useState(createTube);
   const [observingSetup, setObservingSetup] = useState(() => createSetup());
+  const [alignment, setAlignment] = useState(createAlignment);
+  const [focus, setFocus] = useState(createFocus);
   const [legacyProgressAvailable, setLegacyProgressAvailable] = useState(false);
   const [started, setStarted] = useState(false);
   const [stage, setStage] = useState(0);
@@ -133,7 +138,7 @@ export default function Home() {
   const [observationPos, setObservationPos] = useState({ x: 42, y: 160 });
   const [observationDragging, setObservationDragging] = useState(false);
   const [observationDropHint, setObservationDropHint] = useState(false);
-  const [complete, setComplete] = useState(false);
+  const complete = focusReady(focus);
   const [hasLoadedProgress, setHasLoadedProgress] = useState(false);
   const setValue = (index: number, value: number) =>
     setValues((v) => v.map((n, i) => (i === index ? value : n)));
@@ -144,12 +149,14 @@ export default function Home() {
 
   useEffect(() => {
     try {
-      const currentSave = localStorage.getItem(SETUP_STORAGE_KEY);
+      const focusSave = localStorage.getItem(FOCUS_STORAGE_KEY);
+      const alignmentSave = focusSave ?? localStorage.getItem(ALIGNMENT_STORAGE_KEY);
+      const currentSave = alignmentSave ?? localStorage.getItem(SETUP_STORAGE_KEY);
       const tubeSave = localStorage.getItem(TUBE_STORAGE_KEY);
       const counterSave = localStorage.getItem(COUNTERWEIGHT_STORAGE_KEY);
       const mountSave = localStorage.getItem(MOUNT_STORAGE_KEY);
       const saved = currentSave ?? tubeSave ?? counterSave ?? mountSave ?? localStorage.getItem(TRIPOD_STORAGE_KEY);
-      setLegacyProgressAvailable(!currentSave && (!!saved || !!localStorage.getItem('telescope-lab-progress')));
+      setLegacyProgressAvailable(!focusSave && (!!saved || !!localStorage.getItem('telescope-lab-progress')));
       if (saved) {
         const data = JSON.parse(saved);
         const restored = restoreTripod(data.tripodLesson);
@@ -196,10 +203,14 @@ export default function Home() {
           setHasLoadedProgress(true);
           return;
         }
-        setStage(savedStage);
+        const restoredAlignment = restoreAlignment(alignmentSave ? data.alignment : null, true);
+        setAlignment(restoredAlignment);
+        const restoredFocus = restoreFocus(focusSave ? data.focus : null, alignmentReady(restoredAlignment));
+        setFocus(restoredFocus);
+        setStage(alignmentReady(restoredAlignment) ? savedStage : Math.min(savedStage,5));
         setValues(
           initial.map((n, i) =>
-            typeof data.values?.[i] === 'number' ? data.values[i] : n,
+            i === 8 && !alignmentReady(restoredAlignment) ? n : typeof data.values?.[i] === 'number' && Number.isFinite(data.values[i]) ? data.values[i] : n,
           ),
         );
         setTripodPhase(
@@ -207,10 +218,9 @@ export default function Home() {
         );
         setAxisPhase('complete');
         setFinderPhase(
-          ['aligning','complete'].includes(data.finderPhase) ? data.finderPhase : 'aligning',
+          alignmentReady(restoredAlignment) ? 'complete' : restoredAlignment.inspected || savedStage>=5 || ['aligning','complete'].includes(data.finderPhase) ? 'aligning' : 'rack',
         );
-        setObservationPhase(['eyepiece-locked','focusing','complete'].includes(data.observationPhase) ? data.observationPhase : 'eyepiece-locked');
-        setComplete(Boolean(data.complete) && setupReady(restoredSetup) && data.finderPhase === 'complete' && data.observationPhase === 'complete');
+        setObservationPhase(focusReady(restoredFocus) ? 'complete' : restoredFocus.opened ? 'focusing' : 'eyepiece-locked');
       }
     } catch {}
     setHasLoadedProgress(true);
@@ -218,13 +228,15 @@ export default function Home() {
   useEffect(() => {
     if (!hasLoadedProgress) return;
     try { localStorage.setItem(
-      SETUP_STORAGE_KEY,
+      FOCUS_STORAGE_KEY,
       JSON.stringify({
         tripodLesson,
         mountLesson,
         counterweightLesson,
         tubeLesson,
         observingSetup,
+        alignment,
+        focus,
         stage,
         values,
         tripodPhase,
@@ -243,6 +255,8 @@ export default function Home() {
     counterweightLesson,
     tubeLesson,
     observingSetup,
+    alignment,
+    focus,
     hasLoadedProgress,
     stage,
     values,
@@ -263,25 +277,6 @@ export default function Home() {
       setObservationDropHint(false);
     }
   };
-  useEffect(() => {
-    if (
-      stage === 5 &&
-      finderPhase === 'aligning' &&
-      Math.abs(values[6] - 50) < 7 &&
-      Math.abs(values[7] - 50) < 7
-    )
-      setFinderPhase('complete');
-  }, [stage, finderPhase, values]);
-  useEffect(() => {
-    if (
-      stage !== 6 ||
-      observationPhase !== 'focusing' ||
-      Math.abs(values[8] - 50) >= 5
-    )
-      return;
-    const hold = window.setTimeout(() => setObservationPhase('complete'), 850);
-    return () => window.clearTimeout(hold);
-  }, [stage, observationPhase, values]);
 
   const levelPassed =
     Math.abs(values[0] - 50) < 4 && Math.abs(values[9] - 50) < 4;
@@ -293,10 +288,8 @@ export default function Home() {
         counterweightReadiness(counterweightLesson, mountLesson, tripodLesson).ready,
         tubeReadiness(tubeLesson, counterweightLesson, mountLesson, tripodLesson).ready,
         setupReady(observingSetup),
-        finderPhase === 'complete' &&
-          Math.abs(values[6] - 50) < 7 &&
-          Math.abs(values[7] - 50) < 7,
-        observationPhase === 'complete' && Math.abs(values[8] - 50) < 5,
+        alignmentReady(alignment),
+        alignmentReady(alignment) && focusReady(focus),
       ][stage],
     [
       stage,
@@ -310,6 +303,8 @@ export default function Home() {
       tubePhase,
       tubeLesson,
       observingSetup,
+      alignment,
+      focus,
       axisPhase,
       finderPhase,
       observationPhase,
@@ -323,6 +318,8 @@ export default function Home() {
     setCounterweightLesson(createCounterweight());
     setTubeLesson(createTube());
     setObservingSetup(createSetup());
+    setAlignment(createAlignment());
+    setFocus(createFocus());
     setStage(0);
     setValues(initial);
     setTripodPhase('shelf');
@@ -338,8 +335,7 @@ export default function Home() {
     setFinderPos({ x: 42, y: 160 });
     setObservationPhase('diagonal-rack');
     setObservationPos({ x: 42, y: 160 });
-    setComplete(false);
-    try { localStorage.removeItem(SETUP_STORAGE_KEY); } catch {}
+    try { localStorage.removeItem(FOCUS_STORAGE_KEY); } catch {}
   };
   const actOnTripod = (action: TripodAction) => {
     const payloadMounted = mountLesson.placed || counterPhase !== 'rack' || tubePhase !== 'rack';
@@ -359,12 +355,22 @@ export default function Home() {
   const actOnSetup = (action: SetupAction) => {
     setObservingSetup(current => setupReducer(current, action, tubeReadiness(tubeLesson, counterweightLesson, mountLesson, tripodLesson).ready, finderPhase !== 'rack'));
   };
+  const actOnAlignment = (action: AlignmentAction) => {
+    const result = alignmentReducer(alignment, action, setupReady(observingSetup), focus.opened);
+    setAlignment(result);
+    setFinderPhase(alignmentReady(result) ? 'complete' : 'aligning');
+  };
+  const actOnFocus = (action: FocusAction) => {
+    setFocus(current => {
+      return focusReducer(current, action, setupReady(observingSetup) && alignmentReady(alignment));
+    });
+  };
   const actOnTube = (action: TubeAction) => {
     const result = tubeReducer(tubeLesson, action, counterweightLesson, mountLesson, tripodLesson, laterTubeWork);
     setTubeLesson(result);
     setTubePhase(result.placed ? (result.checked ? 'locked' : 'snapped') : 'rack');
   };
-  const next = () => (stage === 6 ? setComplete(true) : setStage((s) => s + 1));
+  const next = () => { if(stage < 6) setStage((s) => s + 1); };
   const phaseCopy =
     tripodPhase === 'shelf'
       ? {
@@ -587,7 +593,7 @@ export default function Home() {
             <span>직접 조작</span>
           </div>
           <MissionBrief />
-          {legacyProgressAvailable && <p>부속품을 먼저 장착한 뒤 균형을 맞추는 실습으로 바뀌었습니다. 이전 기록은 별도로 보관하며 유효한 1~4단계 기록을 이어받습니다. 새 부속품·균형 확인을 진행하세요.</p>}
+          {legacyProgressAvailable && <p>7단계가 상의 변화를 관찰하며 초점을 찾는 실습으로 바뀌었습니다. 이전 기록은 별도로 보관하며 유효한 1~6단계 기록을 이어받습니다. 예전 초점 완료는 새 관측 완료로 처리하지 않습니다.</p>}
           <Button className="launch" onClick={() => setStarted(true)}>
             관측 임무 시작 <ChevronRight />
           </Button>
@@ -601,7 +607,7 @@ export default function Home() {
     );
 
   return (
-    <main className={`sim-shell ${stage <= 4 ? 'tripod-mode' : ''}`}>
+    <main className="sim-shell tripod-mode">
       <header className="topbar glass">
         <div className="brand">
           <span className="brand-icon">✦</span>
@@ -669,7 +675,11 @@ export default function Home() {
         if (finderPhase === 'rack') setFinderPhase('aligning');
         if (observationPhase === 'diagonal-rack') setObservationPhase('eyepiece-locked');
         setStage(5);
-      }} /> : <>
+      }} /> : stage === 5 ? <AlignmentLesson state={alignment} setup={observingSetup} tripod={tripodLesson} readOnly={focus.opened} onAction={actOnAlignment} onBack={()=>setStage(4)} onAdvance={()=>{
+        if(!alignmentReady(alignment))return;
+        setFinderPhase('complete');
+        setStage(6);
+      }}/> : stage === 6 ? <FocusLesson state={focus} alignment={alignment} setup={observingSetup} tripod={tripodLesson} onAction={actOnFocus} onBack={()=>setStage(5)} onReset={reset}/> : <>
       <section
         className={`workbench ${stage === 0 && tripodPhase === 'level' ? 'level-camera' : ''}`}
       >
@@ -1208,45 +1218,6 @@ export default function Home() {
       </aside>
 
       </>}
-      {complete && (
-        <div className="complete-overlay">
-          <section className="complete-card glass">
-            <div className="complete-visual">
-              <img
-                src="/telescope-observation-ready-v1.png"
-                alt="설치가 완료된 소형 굴절망원경"
-              />
-              <Trophy />
-            </div>
-            <div className="complete-copy">
-              <div className="eyebrow">MISSION COMPLETE</div>
-              <h2>첫 관측에 성공했어요!</h2>
-              <p>
-                삼각대 수평부터 접안부 초점까지 이번 실습의 7단계를
-                완성했습니다. 실제 장비의 설치 절차는 해당 설명서를 확인하세요.
-              </p>
-              <div className="achievement-row">
-                <span>
-                  <Check /> 7단계 조립
-                </span>
-                <span>
-                  <Check /> 두 축 균형
-                </span>
-                <span>
-                  <Check /> 목성 초점
-                </span>
-              </div>
-              <div className="score">
-                <b>7 / 7</b>
-                <span>완료 단계</span>
-              </div>
-              <Button className="launch" onClick={reset}>
-                한 번 더 연습하기 <RotateCcw />
-              </Button>
-            </div>
-          </section>
-        </div>
-      )}
       <footer>
         <span>관측지 · 해발 640m</span>
         <span>맑음 · 시상 4/5</span>
